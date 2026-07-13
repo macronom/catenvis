@@ -1,0 +1,18 @@
+# Catenvis - front-controller routing and hardening.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+
+	# Adjust the base directory if the app runs in a subdirectory.
+	# RewriteBase /
+
+	# Serve existing files/directories (e.g. /assets/...) directly.
+	RewriteCond %{REQUEST_FILENAME} -f [OR]
+	RewriteCond %{REQUEST_FILENAME} -d
+	RewriteRule ^ - [L]
+
+	# Route everything else to the front controller.
+	RewriteRule ^ index.php [L]
+</IfModule>

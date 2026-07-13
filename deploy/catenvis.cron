@@ -1,0 +1,20 @@
+# Catenvis - daily refresh of new episodes from the TMDB API.
+#
+# Runs on the 24/7 server (<your-server>), not locally.
+#
+# Install (manually, on the server):
+#   sudo cp /var/www/catenvis/deploy/catenvis.cron /etc/cron.d/catenvis
+#   sudo chown root:root /etc/cron.d/catenvis
+#   sudo chmod 644 /etc/cron.d/catenvis
+#
+# Notes:
+# - Files in /etc/cron.d/ have an extra user field (here: www-data) - adjust
+#   it (and the paths) to match your environment.
+# - The file name must not contain a dot (cron would ignore it otherwise).
+# - Changes are picked up by the cron daemon automatically (no reload needed).
+
+PATH=/usr/bin:/bin
+MAILTO=""
+
+# Minute Hour Day Month Weekday  User      Command
+31 6 * * *  www-data  /usr/bin/php /var/www/catenvis/bin/update_followed.php >> /var/www/catenvis/catenvis.log 2>&1

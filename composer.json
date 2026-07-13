@@ -1,0 +1,20 @@
+{
+	"name": "catenvis/catenvis",
+	"description": "Catenvis - track TV series and new episodes (TMDB)",
+	"type": "project",
+	"license": "GPL-3.0-or-later",
+	"require": {
+		"php": ">=8.3"
+	},
+	"require-dev": {
+		"phpstan/phpstan": "^1.11"
+	},
+	"autoload": {
+		"psr-4": {
+			"Catenvis\\": "src/"
+		}
+	},
+	"config": {
+		"optimize-autoloader": true
+	}
+}

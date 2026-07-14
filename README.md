@@ -61,6 +61,10 @@ Series and episode data comes from [TMDB](https://www.themoviedb.org/).
 5. **First user:** create the initial admin with
    `php bin/create_user.php <username> <password> --admin`.
 
+**Updating:** after pulling a new version, apply pending schema changes with
+`php bin/migrate.php` (idempotent; see
+[`sql/migrations/README.md`](sql/migrations/README.md)).
+
 ## Translations
 
 UI translations are flat JSON files in `lang/` (English is the source

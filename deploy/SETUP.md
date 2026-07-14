@@ -10,8 +10,9 @@ to the MySQL database configured in `config/config.php`.
 
 Create a MySQL/MariaDB database and user and load the schema. The exact
 statements and load command are documented in the header of
-[`sql/schema.sql`](../sql/schema.sql). Catenvis has no migration tooling -
-`sql/schema.sql` is the single source of truth for the schema.
+[`sql/schema.sql`](../sql/schema.sql) - it always contains the full current
+schema, so a fresh install needs nothing else. Later updates apply schema
+changes as deltas via `php bin/migrate.php` (see "Ongoing operation").
 
 ## 2. Prepare the server (via `ssh <your-server>`)
 
@@ -98,5 +99,13 @@ deploy/deploy.sh
 ```
 
 - `config/config.php` and `catenvis.log` on the server are left untouched.
-- There are no automatic database migrations: `sql/schema.sql` is the single
-  source of truth for the schema, so apply schema changes from there.
+- Database migrations are not applied automatically. After deploying a
+  version that ships new files in `sql/migrations/`, run on the server:
+
+  ```bash
+  php /var/www/catenvis/bin/migrate.php --status   # read-only preview
+  php /var/www/catenvis/bin/migrate.php            # apply pending migrations
+  ```
+
+  The command is idempotent and safe to re-run. If several instances share
+  one database, deploy the new code everywhere first, then migrate once.

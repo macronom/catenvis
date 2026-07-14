@@ -10,6 +10,11 @@
 --
 -- Step 2: load this schema into the catenvis database, e.g.:
 --   mysql -h <db-host> -u catenvis -p catenvis < sql/schema.sql
+--
+-- This file always reflects the CURRENT full schema - a fresh install needs
+-- nothing else. Schema changes additionally ship as delta files in
+-- sql/migrations/ so existing installations can catch up with
+-- "php bin/migrate.php" (see sql/migrations/README.md).
 
 SET NAMES utf8mb4;
 
@@ -136,3 +141,16 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 	KEY idx_login_attempts_ip (ip, attempted_at),
 	KEY idx_login_attempts_username (username, attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Applied schema migrations (see sql/migrations/README.md). bin/migrate.php
+-- creates this table on existing installations if it is missing.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+	migration  VARCHAR(255) NOT NULL,
+	applied_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (migration)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migrations already folded into this file count as applied on a fresh
+-- install. When folding in a migration, also add its marker here:
+--   INSERT INTO schema_migrations (migration) VALUES ('NNN_description.sql');
+-- (none yet)

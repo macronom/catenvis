@@ -3,3 +3,4 @@
 /.cache/
 *.log
 /deploy/deploy.env
+/.phpunit.result.cache

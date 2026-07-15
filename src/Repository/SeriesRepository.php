@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Catenvis\Repository;
 
 use Catenvis\Database;
+use Catenvis\EpisodeTitle;
 
 /**
  * Database access to series, episodes and user_series.
@@ -115,24 +116,42 @@ final class SeriesRepository {
 	}
 
 	/**
-	 * All episodes of a series with titles in the requested language
-	 * (fallback: the base language - its rows always exist), ordered by
-	 * season/episode. Empty names are "not available" markers and fall
-	 * through via NULLIF.
+	 * All episodes of a series with a display title resolved via the chain
+	 * own language -> English -> base language, ordered by season/episode.
+	 * Empty names and TMDB auto-placeholders ("Folge 5") are skipped by
+	 * EpisodeTitle::pick, so the returned 'name' is a real title or ''.
 	 *
 	 * @return list<array<string, mixed>>
 	 */
 	public function episodesForSeries(int $seriesId, string $lang = 'en', string $baseLang = 'en'): array {
-		return $this->db->fetchAll(
+		$rows = $this->db->fetchAll(
 			"SELECT e.*,
-				COALESCE(NULLIF(etu.name, ''), NULLIF(etb.name, '')) AS name
+				etu.name AS name_own,
+				ete.name AS name_en,
+				etb.name AS name_base
 			 FROM episodes e
 			 LEFT JOIN episode_translations etu ON etu.episode_id = e.id AND etu.lang = ?
+			 LEFT JOIN episode_translations ete ON ete.episode_id = e.id AND ete.lang = 'en'
 			 LEFT JOIN episode_translations etb ON etb.episode_id = e.id AND etb.lang = ?
 			 WHERE e.series_id = ?
 			 ORDER BY e.season_number, e.episode_number",
 			[$lang, $baseLang, $seriesId]
 		);
+
+		foreach ($rows as &$row) {
+			$row['name'] = EpisodeTitle::pick(
+				[
+					[(string) ($row['name_own'] ?? ''), $lang],
+					[(string) ($row['name_en'] ?? ''), 'en'],
+					[(string) ($row['name_base'] ?? ''), $baseLang],
+				],
+				(int) $row['episode_number']
+			);
+			unset($row['name_own'], $row['name_en'], $row['name_base']);
+		}
+		unset($row);
+
+		return $rows;
 	}
 
 	/**

@@ -56,13 +56,12 @@ final class UserRepository {
 	}
 
 	/**
-	 * All active episode title languages: preferences of non-admin users plus
-	 * the base fetch language (its season fetch always yields the base rows).
-	 *
-	 * Unlike series titles there is no 'en' base tier, because every extra
-	 * language costs one season request per season. To retrofit an English
-	 * fallback later, simply merge 'en' into this list - the due-check will
-	 * backfill all series automatically.
+	 * All active episode title languages: preferences of non-admin users, the
+	 * base fetch language, and 'en' (the fallback tier, mirroring series
+	 * titles). Each language costs one season request per season, but 'en'
+	 * gives every user a real title when their own language only has TMDB
+	 * placeholders. Adding it makes series lacking English episode rows due
+	 * for refresh, so the daily cron backfills English titles automatically.
 	 *
 	 * @param string $baseLang ISO code of the TMDB base request language.
 	 * @return list<string>
@@ -71,7 +70,7 @@ final class UserRepository {
 		$rows  = $this->db->fetchAll('SELECT DISTINCT pref_lang FROM users WHERE is_admin = 0');
 		$langs = array_map(static fn(array $r): string => (string) $r['pref_lang'], $rows);
 
-		return array_values(array_unique(array_merge([$baseLang], $langs)));
+		return array_values(array_unique(array_merge([$baseLang, 'en'], $langs)));
 	}
 
 	/**

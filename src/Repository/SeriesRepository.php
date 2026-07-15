@@ -144,8 +144,7 @@ final class SeriesRepository {
 					[(string) ($row['name_own'] ?? ''), $lang],
 					[(string) ($row['name_en'] ?? ''), 'en'],
 					[(string) ($row['name_base'] ?? ''), $baseLang],
-				],
-				(int) $row['episode_number']
+				]
 			);
 			unset($row['name_own'], $row['name_en'], $row['name_base']);
 		}

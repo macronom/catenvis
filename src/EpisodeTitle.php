@@ -44,9 +44,9 @@ final class EpisodeTitle {
 	 * @param list<array{0: string, 1: string}> $tiers [name, language] pairs
 	 *        in priority order, e.g. [[own, 'de'], [english, 'en'], [base, 'de']].
 	 */
-	public static function pick(array $tiers, int $episodeNumber): string {
+	public static function pick(array $tiers): string {
 		foreach ($tiers as [$name, $lang]) {
-			if ($name !== '' && !self::isPlaceholder($name, $episodeNumber, $lang)) {
+			if ($name !== '' && !self::isPlaceholder($name, $lang)) {
 				return $name;
 			}
 		}
@@ -56,17 +56,20 @@ final class EpisodeTitle {
 
 	/**
 	 * Whether $name is a TMDB auto-placeholder for $lang: that language's
-	 * "Episode" word followed by exactly this episode's number. Anchoring to
-	 * the episode number keeps genuine "Word N" titles ("Level 3") safe;
-	 * checking only the language's own word keeps a German "Episode 1" real.
+	 * "Episode" word followed by a bare number. Checking only the language's
+	 * own word keeps a German "Episode 1" real, and a "Level 3" title safe
+	 * (its word is not a placeholder word). The number is deliberately NOT
+	 * anchored to the episode's position: TMDB numbers placeholders absolutely
+	 * across seasons ("Episode 9" for the first episode of season 2), so the
+	 * position would not match from season 2 onwards and the placeholder would
+	 * leak through as a fake title.
 	 */
-	public static function isPlaceholder(string $name, int $episodeNumber, string $lang): bool {
+	public static function isPlaceholder(string $name, string $lang): bool {
 		$word = self::PLACEHOLDER_WORDS[$lang] ?? null;
 		if ($word === null) {
 			return false;
 		}
 
-		return preg_match('/^' . preg_quote($word, '/') . '\s+0*(\d+)$/iu', $name, $m) === 1
-			&& (int) $m[1] === $episodeNumber;
+		return preg_match('/^' . preg_quote($word, '/') . '\s+\d+$/iu', $name) === 1;
 	}
 }

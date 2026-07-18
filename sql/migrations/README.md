@@ -31,10 +31,14 @@ filename order.
   triggers with compound bodies).
 - **Never edit or rename a migration once it may have been applied
   somewhere** — the filename is its identity in `schema_migrations`.
-- MySQL DDL is not transactional: if a statement fails mid-file, earlier
-  statements of that file stay applied and the migration stays unrecorded.
-  Prefer re-runnable statements (e.g. `ADD COLUMN IF NOT EXISTS` on
-  MariaDB/MySQL 8+) so a fixed migration can simply be retried.
+- Keep migrations portable across **MySQL and MariaDB**. In particular do
+  **not** use `ADD COLUMN IF NOT EXISTS` / `DROP COLUMN IF EXISTS` for columns
+  - that syntax is MariaDB-only and MySQL rejects it. The runner applies each
+  migration exactly once (tracked in `schema_migrations`), so DDL idempotency
+  is not needed anyway.
+- DDL is not transactional: if a statement fails mid-file, earlier statements
+  stay applied while the migration stays unrecorded. Keep one logical change
+  per file so a retry after fixing the SQL is straightforward.
 - **Every migration must also be folded into `sql/schema.sql`**: apply the
   same change to the table definitions there and add the marker line
   `INSERT INTO schema_migrations (migration) VALUES ('NNN_....sql');` so

@@ -100,18 +100,18 @@ final class SeriesRepository {
 	}
 
 	/**
-	 * Creates or updates an episode title translation (UPSERT).
+	 * Creates or updates an episode title + description translation (UPSERT).
 	 *
 	 * INSERT ... SELECT guards against episode ids not stored (yet): a
 	 * language fetch may return episodes unknown to our base data, which
 	 * would otherwise violate the foreign key.
 	 */
-	public function upsertEpisodeTranslation(int $episodeId, string $lang, string $name): void {
+	public function upsertEpisodeTranslation(int $episodeId, string $lang, string $name, ?string $overview = null): void {
 		$this->db->execute(
-			'INSERT INTO episode_translations (episode_id, lang, name)
-			 SELECT e.id, ?, ? FROM episodes e WHERE e.id = ?
-			 ON DUPLICATE KEY UPDATE name = VALUES(name)',
-			[$lang, $name, $episodeId]
+			'INSERT INTO episode_translations (episode_id, lang, name, overview)
+			 SELECT e.id, ?, ?, ? FROM episodes e WHERE e.id = ?
+			 ON DUPLICATE KEY UPDATE name = VALUES(name), overview = VALUES(overview)',
+			[$lang, $name, $overview, $episodeId]
 		);
 	}
 
@@ -120,6 +120,8 @@ final class SeriesRepository {
 	 * own language -> English -> base language, ordered by season/episode.
 	 * Empty names and TMDB auto-placeholders ("Folge 5") are skipped by
 	 * EpisodeTitle::pick, so the returned 'name' is a real title or ''.
+	 * 'overview' follows the same own -> English -> base fallback (first
+	 * non-empty; descriptions have no placeholder problem).
 	 *
 	 * @return list<array<string, mixed>>
 	 */
@@ -128,7 +130,8 @@ final class SeriesRepository {
 			"SELECT e.*,
 				etu.name AS name_own,
 				ete.name AS name_en,
-				etb.name AS name_base
+				etb.name AS name_base,
+				COALESCE(NULLIF(etu.overview, ''), NULLIF(ete.overview, ''), etb.overview) AS overview
 			 FROM episodes e
 			 LEFT JOIN episode_translations etu ON etu.episode_id = e.id AND etu.lang = ?
 			 LEFT JOIN episode_translations ete ON ete.episode_id = e.id AND ete.lang = 'en'

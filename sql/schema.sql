@@ -79,13 +79,14 @@ CREATE TABLE IF NOT EXISTS episodes (
 	CONSTRAINT fk_episodes_series FOREIGN KEY (series_id) REFERENCES series (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Translated episode titles. Base rows ('de') come from the de-DE season
--- fetch; every additional language costs one extra season fetch.
+-- Translated episode titles and descriptions. Base rows ('de') come from the
+-- de-DE season fetch; every additional language costs one extra season fetch.
 -- name = '' marks "no translation available at TMDB" (anti-loop marker).
 CREATE TABLE IF NOT EXISTS episode_translations (
 	episode_id INT UNSIGNED NOT NULL,
 	lang       VARCHAR(8)   NOT NULL,
 	name       VARCHAR(255) NOT NULL,
+	overview   TEXT         NULL DEFAULT NULL,
 	PRIMARY KEY (episode_id, lang),
 	CONSTRAINT fk_episode_translations_episode FOREIGN KEY (episode_id) REFERENCES episodes (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -153,4 +154,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 -- Migrations already folded into this file count as applied on a fresh
 -- install. When folding in a migration, also add its marker here:
 --   INSERT INTO schema_migrations (migration) VALUES ('NNN_description.sql');
--- (none yet)
+INSERT INTO schema_migrations (migration) VALUES ('001_add_episode_overview.sql');

@@ -43,7 +43,11 @@ $service      = new SeriesService($tmdb, $repo, $langs, $episodeLangs);
 
 // "--all" refreshes every followed series (e.g. for a one-off backfill),
 // otherwise only the ones due today (staggered or with a missing language).
-$all       = in_array('--all', $_SERVER['argv'] ?? [], true);
+// "--force" additionally re-fetches every season in every active language
+// (to backfill fields added later, e.g. episode overviews).
+$argv      = $_SERVER['argv'] ?? [];
+$all       = in_array('--all', $argv, true);
+$force     = in_array('--force', $argv, true);
 $seriesIds = $all ? $repo->followedSeriesIds() : $repo->seriesDueForRefresh($langs, $episodeLangs);
 $now       = date('Y-m-d H:i:s');
 
@@ -53,7 +57,7 @@ $ok = 0;
 $failed = 0;
 foreach ($seriesIds as $seriesId) {
 	try {
-		$refreshed = $service->sync($seriesId);
+		$refreshed = $service->sync($seriesId, $force);
 		printf("  Series %d: %d season(s) refreshed.\n", $seriesId, $refreshed);
 		$ok++;
 	} catch (\Throwable $e) {

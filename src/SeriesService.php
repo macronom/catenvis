@@ -35,9 +35,12 @@ final class SeriesService {
 	/**
 	 * Synchronizes a series along with its (changed) seasons from TMDB.
 	 *
+	 * @param bool $forceSeasons Re-fetch every season in every active language,
+	 *                           even when title coverage is already complete
+	 *                           (one-time backfill, e.g. of episode overviews).
 	 * @return int Number of seasons reloaded from TMDB.
 	 */
-	public function sync(int $seriesId): int {
+	public function sync(int $seriesId, bool $forceSeasons = false): int {
 		$details = $this->tmdb->tvDetails($seriesId);
 
 		$externalIds     = is_array($details['external_ids'] ?? null) ? $details['external_ids'] : [];
@@ -109,8 +112,9 @@ final class SeriesService {
 			$missing  = $missingBySeason[$seasonNumber] ?? [];
 
 			// Base fetch when episodes are new/changed, for the latest
-			// (running) season, or when base language title rows are missing.
-			$needsBase = $existing === 0 || $existing !== $expected
+			// (running) season, when base language title rows are missing, or
+			// when a backfill forces every season.
+			$needsBase = $forceSeasons || $existing === 0 || $existing !== $expected
 				|| $seasonNumber === $maxSeason || in_array($this->baseLang, $missing, true);
 
 			if (!$needsBase && $missing === []) {
@@ -126,8 +130,10 @@ final class SeriesService {
 			}
 
 			// Additional languages: all of them once new episodes appeared
-			// (coverage cannot know them yet), otherwise only the reported gaps.
-			$fetchLangs = $hasNew ? $extraLanguages : array_values(array_diff($missing, [$this->baseLang]));
+			// (coverage cannot know them yet) or on a forced backfill (to fill
+			// overviews on rows whose title coverage is already complete),
+			// otherwise only the reported gaps.
+			$fetchLangs = ($forceSeasons || $hasNew) ? $extraLanguages : array_values(array_diff($missing, [$this->baseLang]));
 			foreach ($fetchLangs as $lang) {
 				$this->syncSeasonTranslations($seriesId, $seasonNumber, $lang, $knownIds);
 			}
@@ -174,7 +180,12 @@ final class SeriesService {
 				'episode_number' => (int) ($episode['episode_number'] ?? 0),
 				'air_date'       => $this->dateOrNull($episode['air_date'] ?? null),
 			]);
-			$this->series->upsertEpisodeTranslation($episodeId, $this->baseLang, (string) ($episode['name'] ?? ''));
+			$this->series->upsertEpisodeTranslation(
+				$episodeId,
+				$this->baseLang,
+				(string) ($episode['name'] ?? ''),
+				$this->stringOrNull($episode['overview'] ?? null)
+			);
 			$ids[] = $episodeId;
 		}
 
@@ -192,16 +203,18 @@ final class SeriesService {
 		$season = $this->tmdb->season($seriesId, $seasonNumber, $lang);
 		$episodes = is_array($season['episodes'] ?? null) ? $season['episodes'] : [];
 
-		$names = [];
+		$names     = [];
+		$overviews = [];
 		foreach ($episodes as $episode) {
 			$episodeId = (int) ($episode['id'] ?? 0);
 			if ($episodeId !== 0) {
-				$names[$episodeId] = (string) ($episode['name'] ?? '');
+				$names[$episodeId]     = (string) ($episode['name'] ?? '');
+				$overviews[$episodeId] = $this->stringOrNull($episode['overview'] ?? null);
 			}
 		}
 
 		foreach ($episodeIds as $episodeId) {
-			$this->series->upsertEpisodeTranslation($episodeId, $lang, $names[$episodeId] ?? '');
+			$this->series->upsertEpisodeTranslation($episodeId, $lang, $names[$episodeId] ?? '', $overviews[$episodeId] ?? null);
 		}
 	}
 

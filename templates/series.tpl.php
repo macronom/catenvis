@@ -134,10 +134,20 @@ $statusAction = static function (string $status, string $label, string $class = 
 					$aired   = !empty($ep['air_date']) && $ep['air_date'] <= $today;
 					$rowClass = $isSeen ? 'seen' : ($aired ? 'unseen' : 'upcoming');
 					?>
+					<?php
+					$epNum      = $e($episodeCode((int) $seasonNumber, (int) $ep['episode_number']));
+					$epName     = $e($ep['name'] ?? '');
+					$epDate     = $e($ep['air_date'] ?? '');
+					$epOverview = trim((string) ($ep['overview'] ?? ''));
+					?>
 					<li class="episode <?= $rowClass ?>">
-						<span class="ep-num"><?= $e($episodeCode((int) $seasonNumber, (int) $ep['episode_number'])) ?></span>
-						<span class="ep-name"><?= $e($ep['name'] ?? '') ?></span>
-						<span class="ep-date"><?= $e($ep['air_date'] ?? '') ?></span>
+						<span class="ep-num"><?= $epNum ?></span>
+						<?php if ($epOverview !== ''): ?>
+							<button type="button" class="ep-name ep-expand" aria-expanded="false"><?= $epName ?></button>
+						<?php else: ?>
+							<span class="ep-name"><?= $epName ?></span>
+						<?php endif; ?>
+						<span class="ep-date"><?= $epDate ?></span>
 						<span class="ep-toggle">
 							<?php if (!$aired && !$isSeen): ?>
 								<span class="upcoming-label"><?= $e($t('upcoming')) ?></span>
@@ -147,6 +157,9 @@ $statusAction = static function (string $status, string $label, string $class = 
 								<?= $watchAction('episode', ['episode_id' => (string) $epId], 'watch', $t('mark watched'), 'btn-check') ?>
 							<?php endif; ?>
 						</span>
+						<?php if ($epOverview !== ''): ?>
+							<p class="ep-overview" hidden><?= $e($epOverview) ?></p>
+						<?php endif; ?>
 					</li>
 				<?php endforeach; ?>
 			</ul>
@@ -165,6 +178,18 @@ $statusAction = static function (string $status, string $label, string $class = 
 			if (!window.confirm(form.dataset.confirm)) {
 				e.preventDefault();
 			}
+		});
+	});
+
+	document.querySelectorAll('.ep-expand').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			var overview = btn.closest('.episode').querySelector('.ep-overview');
+			if (!overview) {
+				return;
+			}
+			var show = overview.hidden;
+			overview.hidden = !show;
+			btn.setAttribute('aria-expanded', show ? 'true' : 'false');
 		});
 	});
 })();

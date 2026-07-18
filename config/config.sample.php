@@ -58,6 +58,14 @@ return [
 		'logo_base_url'     => 'https://image.tmdb.org/t/p/w92',
 	],
 
+	'update' => [
+		// Global "stale data" warning. When the newest successful series sync
+		// is at least this many days old, a banner tells logged-in users the
+		// automatic nightly update may have stopped (dead cron, broken API key,
+		// TMDB down). A value below 1 disables the warning.
+		'stale_after_days' => 3,
+	],
+
 	// Note: the selectable languages are not configured here. English is
 	// always available (source language); every other language appears
 	// automatically once a catalog file lang/<code>.json exists

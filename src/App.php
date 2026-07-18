@@ -87,6 +87,7 @@ final class App {
 		$this->view->share('app', $this);
 		$this->view->share('auth', $this->auth);
 		$this->view->share('currentUser', $this->auth->user());
+		$this->view->share('dataStale', $this->auth->isLoggedIn() ? $this->dataStaleDays() : null);
 		$this->view->share('cspNonce', $this->cspNonce);
 		$this->view->share('imageBase', (string) $this->config->get('tmdb.image_base_url', ''));
 		$this->view->share('logoBase', (string) $this->config->get('tmdb.logo_base_url', 'https://image.tmdb.org/t/p/w92'));
@@ -260,6 +261,17 @@ final class App {
 		if ($this->auth->isAdmin()) {
 			$this->redirect('/admin/users');
 		}
+	}
+
+	/**
+	 * Whole days the cached TMDB data is behind, or null when it is still
+	 * fresh. Shared with the layout to drive the global stale-data banner.
+	 * Derived from the newest successful sync (no dedicated heartbeat needed).
+	 */
+	private function dataStaleDays(): ?int {
+		$threshold = (int) $this->config->get('update.stale_after_days', 3);
+
+		return DataFreshness::staleDays($this->series->lastSyncAt(), date('Y-m-d H:i:s'), $threshold);
 	}
 
 	/**

@@ -31,6 +31,14 @@
 </header>
 
 <main class="content">
+	<?php if (($dataStale ?? null) !== null): ?>
+		<div class="notice-warning">
+			<p><?= $e($dataStale === 1
+				? $t('The series data has not been updated since yesterday - the automatic update may have stopped. Please notify the administrator.')
+				: $t('The series data has not been updated in %d days - the automatic update may have stopped. Please notify the administrator.', $dataStale)) ?></p>
+		</div>
+	<?php endif; ?>
+
 	<?php foreach (($flashes ?? []) as $flash): ?>
 		<div class="flash flash-<?= $e($flash['type']) ?>"><?= $e($flash['message']) ?></div>
 	<?php endforeach; ?>

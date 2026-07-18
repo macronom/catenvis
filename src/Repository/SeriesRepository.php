@@ -300,6 +300,17 @@ final class SeriesRepository {
 		return array_map(static fn(array $r): int => (int) $r['id'], $rows);
 	}
 
+	/**
+	 * Timestamp of the most recent successful series sync (MAX(synced_at)), or
+	 * null when nothing has been synced yet. Drives the global stale-data
+	 * warning: if this stops advancing, the nightly refresh has stopped working.
+	 */
+	public function lastSyncAt(): ?string {
+		$value = $this->db->fetchValue('SELECT MAX(synced_at) FROM series');
+
+		return $value === null ? null : (string) $value;
+	}
+
 	// --- Follow status per user --------------------------------------------------
 
 	/**

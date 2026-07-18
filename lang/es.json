@@ -159,5 +159,7 @@
 	"%d of your series could not be updated - they may have been removed or merged on TMDB:": "%d de tus series no se pudieron actualizar: puede que se hayan eliminado o fusionado en TMDB:",
 	"Check TMDB for a replacement; you can add the new entry and remove this one below.": "Busca un reemplazo en TMDB; puedes añadir la nueva entrada y eliminar esta de abajo.",
 	"This series could not be updated - it may have been removed or merged on TMDB.": "Esta serie no se pudo actualizar: puede que se haya eliminado o fusionado en TMDB.",
-	"This series could not be updated since %s - it may have been removed or merged on TMDB.": "Esta serie no se pudo actualizar desde %s: puede que se haya eliminado o fusionado en TMDB."
+	"This series could not be updated since %s - it may have been removed or merged on TMDB.": "Esta serie no se pudo actualizar desde %s: puede que se haya eliminado o fusionado en TMDB.",
+	"The series data has not been updated since yesterday - the automatic update may have stopped. Please notify the administrator.": "Los datos de las series no se han actualizado desde ayer: la actualización automática podría haberse detenido. Avisa al administrador.",
+	"The series data has not been updated in %d days - the automatic update may have stopped. Please notify the administrator.": "Los datos de las series no se han actualizado desde hace %d días: la actualización automática podría haberse detenido. Avisa al administrador."
 }

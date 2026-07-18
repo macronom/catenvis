@@ -241,11 +241,12 @@ final class SeriesRepository {
 	}
 
 	/**
-	 * IDs of followed series that should be refreshed today – staggered
-	 * by recency to reduce TMDB traffic:
+	 * IDs of followed series that should be refreshed today. Each class has a
+	 * fixed cycle, and series are spread evenly across the cycle's days by ID
+	 * (via (day number + id) MOD cycle) so not all of them sync the same night:
 	 *  - running series with upcoming episodes: daily,
-	 *  - ended/canceled series: ~every two months (spread over ~2 weeks by ID),
-	 *  - all others: ~weekly (spread over a few days by ID).
+	 *  - ended/canceled series: every 50 days,
+	 *  - all others (running, nothing scheduled): every 7 days.
 	 * Also due: series that lack a translation row for an active
 	 * language (marker rows with an empty name count as present,
 	 * otherwise the series would stay due forever) — for series titles as well as episode titles.
@@ -271,17 +272,22 @@ final class SeriesRepository {
 					WHERE e.series_id = s.id AND e.season_number >= 1
 					  AND (SELECT COUNT(*) FROM episode_translations et
 						WHERE et.episode_id = e.id AND et.lang IN ($episodePh)) < ?)
-				 OR DATEDIFF(CURDATE(), DATE(s.synced_at)) >= (
-					CASE
-						WHEN (s.next_air_date IS NOT NULL AND s.next_air_date >= CURDATE())
-							 OR EXISTS (SELECT 1 FROM episodes e
-								WHERE e.series_id = s.id AND e.air_date > CURDATE())
-							THEN 1
-						WHEN s.status IN ('Ended', 'Canceled')
-							THEN 55 + (s.id MOD 14)
-						ELSE 7 + (s.id MOD 5)
-					END
-				 )
+				 -- Time-based refresh. Series with an upcoming episode: daily.
+				 -- Otherwise a fixed per-class cycle, spread evenly across its days
+				 -- via (day number + id) MOD cycle so every series of a class shares
+				 -- the same period but they do not all sync the same night (TMDB ids
+				 -- are effectively random modulo the cycle). The extra DATEDIFF term
+				 -- is the safety net: a series whose slot night was skipped (e.g. the
+				 -- cron did not run) is overdue and gets picked up on the next run.
+				 OR CASE
+					WHEN (s.next_air_date IS NOT NULL AND s.next_air_date >= CURDATE())
+						 OR EXISTS (SELECT 1 FROM episodes e
+							WHERE e.series_id = s.id AND e.air_date > CURDATE())
+						THEN DATEDIFF(CURDATE(), DATE(s.synced_at)) >= 1
+					WHEN s.status IN ('Ended', 'Canceled')
+						THEN MOD(TO_DAYS(CURDATE()) + s.id, 50) = 0 OR DATEDIFF(CURDATE(), DATE(s.synced_at)) >= 50
+					ELSE MOD(TO_DAYS(CURDATE()) + s.id, 7) = 0 OR DATEDIFF(CURDATE(), DATE(s.synced_at)) >= 7
+				 END
 			   )
 			   -- Skip series flagged as gone from TMDB (a manual --all still
 			   -- retries them via followedSeriesIds, allowing recovery).

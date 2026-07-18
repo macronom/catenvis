@@ -63,8 +63,44 @@ final class SeriesRepository {
 				number_of_episodes = VALUES(number_of_episodes),
 				last_air_date = VALUES(last_air_date),
 				next_air_date = VALUES(next_air_date),
-				synced_at = NOW()',
+				synced_at = NOW(),
+				sync_error = NULL,
+				sync_failed_at = NULL',
 			$data
+		);
+	}
+
+	/**
+	 * Flags a series as unavailable (a permanent TMDB failure, e.g. a 404 for
+	 * a removed/merged series). A later successful sync clears it via
+	 * upsertSeries; seriesDueForRefresh skips flagged series.
+	 */
+	public function markSyncError(int $seriesId, string $message): void {
+		$this->db->execute(
+			'UPDATE series SET sync_error = ?, sync_failed_at = NOW() WHERE id = ?',
+			[$message, $seriesId]
+		);
+	}
+
+	/**
+	 * Series a user follows (or has deferred) that are currently flagged as
+	 * unavailable, for the dashboard notice. Returns the fields the shared
+	 * $title() helper needs (own-language name, English title, original name).
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function unavailableForUser(int $userId, string $lang): array {
+		return $this->db->fetchAll(
+			"SELECT s.id, s.original_name, s.original_language, s.sync_failed_at,
+				COALESCE(NULLIF(tul.name, ''), NULLIF(ten.name, ''), s.original_name) AS name,
+				ten.name AS title_en
+			 FROM series s
+			 JOIN user_series us ON us.series_id = s.id AND us.user_id = ? AND us.status IN ('following','deferred')
+			 LEFT JOIN series_translations tul ON tul.series_id = s.id AND tul.lang = ?
+			 LEFT JOIN series_translations ten ON ten.series_id = s.id AND ten.lang = 'en'
+			 WHERE s.sync_error IS NOT NULL
+			 ORDER BY name",
+			[$userId, $lang]
 		);
 	}
 
@@ -247,6 +283,9 @@ final class SeriesRepository {
 					END
 				 )
 			   )
+			   -- Skip series flagged as gone from TMDB (a manual --all still
+			   -- retries them via followedSeriesIds, allowing recovery).
+			   AND s.sync_error IS NULL
 			 ORDER BY s.id",
 			[...array_values($seriesLangs), count($seriesLangs),
 			 ...array_values($episodeLangs), count($episodeLangs)]

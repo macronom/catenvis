@@ -55,11 +55,22 @@ printf("[%s] Updating %d %s series.\n", $now, count($seriesIds), $all ? 'followe
 
 $ok = 0;
 $failed = 0;
+$gone = 0;
 foreach ($seriesIds as $seriesId) {
 	try {
 		$refreshed = $service->sync($seriesId, $force);
 		printf("  Series %d: %d season(s) refreshed.\n", $seriesId, $refreshed);
 		$ok++;
+	} catch (\Catenvis\TmdbException $e) {
+		if ($e->isGone()) {
+			// SeriesService already flagged it; it drops out of the nightly
+			// refresh and is surfaced to its followers on the dashboard.
+			fwrite(STDERR, sprintf("  Series %d unavailable (gone), marked and skipped from now on: %s\n", $seriesId, $e->getMessage()));
+			$gone++;
+		} else {
+			fwrite(STDERR, sprintf("  Series %d ERROR (will retry): %s\n", $seriesId, $e->getMessage()));
+			$failed++;
+		}
 	} catch (\Throwable $e) {
 		fwrite(STDERR, sprintf("  Series %d ERROR: %s\n", $seriesId, $e->getMessage()));
 		$failed++;
@@ -68,5 +79,5 @@ foreach ($seriesIds as $seriesId) {
 	usleep(250000);
 }
 
-printf("[%s] Done. Successful: %d, errors: %d.\n", date('Y-m-d H:i:s'), $ok, $failed);
+printf("[%s] Done. Successful: %d, errors: %d, newly unavailable: %d.\n", date('Y-m-d H:i:s'), $ok, $failed, $gone);
 exit($failed > 0 ? 1 : 0);

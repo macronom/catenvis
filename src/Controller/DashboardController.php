@@ -36,6 +36,7 @@ final class DashboardController {
 			'followingTotal' => $this->app->watch->countByFollowStatus($userId, 'following'),
 			'stopped'        => $this->app->watch->seriesPage($userId, $sort, 'stopped', self::PAGE_SIZE, 0, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang),
 			'stoppedTotal'   => $this->app->watch->countByFollowStatus($userId, 'stopped'),
+			'unavailable'    => $this->app->series->unavailableForUser($userId, $this->app->contentLang),
 			'pageSize'       => self::PAGE_SIZE,
 		]);
 	}

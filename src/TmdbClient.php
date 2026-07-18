@@ -151,18 +151,18 @@ final class TmdbClient {
 				continue;
 			}
 			if ($status < 200 || $status >= 300) {
-				throw new RuntimeException("TMDB request failed ($status) for $endpoint");
+				throw new TmdbException("TMDB request failed ($status) for $endpoint", $status);
 			}
 
 			$decoded = json_decode((string) $body, true);
 			if (!is_array($decoded)) {
-				throw new RuntimeException("TMDB: invalid JSON response for $endpoint");
+				throw new TmdbException("TMDB: invalid JSON response for $endpoint");
 			}
 
 			/** @var array<string, mixed> $decoded */
 			return $decoded;
 		}
 
-		throw new RuntimeException("TMDB request failed after $attempts attempts: $lastError");
+		throw new TmdbException("TMDB request failed after $attempts attempts: $lastError");
 	}
 }

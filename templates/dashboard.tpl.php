@@ -1,4 +1,17 @@
 <section>
+	<?php if (!empty($unavailable)): ?>
+		<div class="notice-warning">
+			<p><?= $e(count($unavailable) === 1
+				? $t('One of your series could not be updated - it may have been removed or merged on TMDB:')
+				: $t('%d of your series could not be updated - they may have been removed or merged on TMDB:', count($unavailable))) ?></p>
+			<ul>
+				<?php foreach ($unavailable as $row): ?>
+					<li><a href="<?= $e($url('/series/' . (int) $row['id'])) ?>"><?= $e($title($row)) ?></a></li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+	<?php endif; ?>
+
 	<?php if (empty($following) && empty($stopped)): ?>
 		<p class="empty"><?= $e($t('You are not following any series yet.')) ?> <a href="<?= $e($url('/add')) ?>"><?= $e($t('Add your first series now.')) ?></a></p>
 	<?php endif; ?>

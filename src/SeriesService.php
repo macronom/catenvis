@@ -41,7 +41,16 @@ final class SeriesService {
 	 * @return int Number of seasons reloaded from TMDB.
 	 */
 	public function sync(int $seriesId, bool $forceSeasons = false): int {
-		$details = $this->tmdb->tvDetails($seriesId);
+		try {
+			$details = $this->tmdb->tvDetails($seriesId);
+		} catch (TmdbException $e) {
+			// A permanent 404/410 means TMDB removed or merged the series;
+			// mark it so the nightly refresh skips it and its followers see it.
+			if ($e->isGone()) {
+				$this->series->markSyncError($seriesId, 'Not found on TMDB (' . $e->statusCode() . ')');
+			}
+			throw $e;
+		}
 
 		$externalIds     = is_array($details['external_ids'] ?? null) ? $details['external_ids'] : [];
 		$originalLanguage = $this->stringOrNull($details['original_language'] ?? null);

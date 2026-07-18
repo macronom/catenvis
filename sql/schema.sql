@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS series (
 	last_air_date       DATE         NULL DEFAULT NULL,
 	next_air_date       DATE         NULL DEFAULT NULL,
 	synced_at           DATETIME     NULL DEFAULT NULL,
+	sync_error          VARCHAR(255) NULL DEFAULT NULL,
+	sync_failed_at      DATETIME     NULL DEFAULT NULL,
 	PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -155,3 +157,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 -- install. When folding in a migration, also add its marker here:
 --   INSERT INTO schema_migrations (migration) VALUES ('NNN_description.sql');
 INSERT INTO schema_migrations (migration) VALUES ('001_add_episode_overview.sql');
+INSERT INTO schema_migrations (migration) VALUES ('002_mark_unavailable_series.sql');

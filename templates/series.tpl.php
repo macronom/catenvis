@@ -26,6 +26,16 @@ $statusAction = static function (string $status, string $label, string $class = 
 };
 ?>
 <section class="series-detail">
+	<?php if (!empty($series['sync_error'])): ?>
+		<div class="notice-warning">
+			<?php if (!empty($series['sync_failed_at'])): ?>
+				<p><?= $e($t('This series could not be updated since %s - it may have been removed or merged on TMDB.', $shortDate((string) $series['sync_failed_at']))) ?></p>
+			<?php else: ?>
+				<p><?= $e($t('This series could not be updated - it may have been removed or merged on TMDB.')) ?></p>
+			<?php endif; ?>
+			<p><?= $e($t('Check TMDB for a replacement; you can add the new entry and remove this one below.')) ?></p>
+		</div>
+	<?php endif; ?>
 	<div class="series-header">
 		<div class="poster">
 			<?php if (!empty($series['poster_path']) && $imageBase !== ''): ?>

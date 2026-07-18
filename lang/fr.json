@@ -154,5 +154,10 @@
 	"upcoming": "à venir",
 	"watched": "vu",
 	"yes": "oui",
-	"✓ watched": "✓ vu"
+	"✓ watched": "✓ vu",
+	"One of your series could not be updated - it may have been removed or merged on TMDB:": "Une de vos séries n'a pas pu être mise à jour – elle a peut-être été supprimée ou fusionnée sur TMDB :",
+	"%d of your series could not be updated - they may have been removed or merged on TMDB:": "%d de vos séries n'ont pas pu être mises à jour – elles ont peut-être été supprimées ou fusionnées sur TMDB :",
+	"Check TMDB for a replacement; you can add the new entry and remove this one below.": "Cherchez un remplacement sur TMDB ; vous pouvez ajouter la nouvelle entrée et supprimer celle-ci ci-dessous.",
+	"This series could not be updated - it may have been removed or merged on TMDB.": "Cette série n'a pas pu être mise à jour – elle a peut-être été supprimée ou fusionnée sur TMDB.",
+	"This series could not be updated since %s - it may have been removed or merged on TMDB.": "Cette série n'a pas pu être mise à jour depuis %s – elle a peut-être été supprimée ou fusionnée sur TMDB."
 }

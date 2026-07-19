@@ -1,3 +1,7 @@
+<?php
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+?>
 <section>
 	<?php if (!empty($unavailable)): ?>
 		<div class="notice-warning">

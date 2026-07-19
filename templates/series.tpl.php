@@ -1,4 +1,8 @@
 <?php
+
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+
 $csrf = $app->csrfToken();
 $watchAction = static function (string $scope, array $extra, string $action, string $label, string $class, string $confirm = '') use ($e, $url, $csrf, $series): string {
 	$hidden = '';

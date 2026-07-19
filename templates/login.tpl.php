@@ -1,3 +1,7 @@
+<?php
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+?>
 <section class="auth-card">
 	<h1><?= $e($t('Log in')) ?></h1>
 	<form method="post" action="<?= $e($url('/login')) ?>">

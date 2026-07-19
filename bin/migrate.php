@@ -1,6 +1,9 @@
 #!/usr/bin/php
 <?php
 
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+
 declare(strict_types=1);
 
 /**

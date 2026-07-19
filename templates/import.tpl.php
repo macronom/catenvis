@@ -1,4 +1,8 @@
 <?php
+
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+
 $done     = (int) ($counts['done'] ?? 0);
 $skipped  = (int) ($counts['skipped'] ?? 0);
 $notfound = (int) ($counts['notfound'] ?? 0);

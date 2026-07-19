@@ -1,4 +1,8 @@
 <?php
+
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+
 /**
  * Expects: $row (series with aired_count/watched_count/unseen_count/upcoming_count/status
  *          as well as next_unseen_id/_season/_episode/_name), $imageBase, $e, $url.

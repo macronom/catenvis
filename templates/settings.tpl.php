@@ -1,4 +1,8 @@
 <?php
+
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 macronom
+
 /**
  * Erwartet: $sort, $view, $languages (ISO => Label) sowie die geteilten
  * $titleLang, $contentLang, $auth, $e, $url.

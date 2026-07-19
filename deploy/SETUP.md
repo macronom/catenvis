@@ -8,11 +8,13 @@ to the MySQL database configured in `config/config.php`.
 
 ## 1. Create the database
 
-Create a MySQL/MariaDB database and user and load the schema. The exact
-statements and load command are documented in the header of
-[`sql/schema.sql`](../sql/schema.sql) - it always contains the full current
-schema, so a fresh install needs nothing else. Later updates apply schema
-changes as deltas via `php bin/migrate.php` (see "Ongoing operation").
+Create an (empty) MySQL/MariaDB database and a user for it - the `CREATE
+DATABASE` / `CREATE USER` / `GRANT` statements are in the header of
+[`sql/schema.sql`](../sql/schema.sql). This is the only step that needs
+database-admin (root) privileges; loading the schema itself is done for you by
+`bin/setup.php` in step 3, so no manual `mysql < schema.sql` is required. Later
+updates apply schema changes as deltas via `php bin/migrate.php` (see "Ongoing
+operation").
 
 ## 2. Prepare the server (via `ssh <your-server>`)
 
@@ -37,13 +39,18 @@ php -m | grep -E 'pdo_mysql|curl'
 ```bash
 # Sync files (incl. vendor/, excluding config.php and logs)
 deploy/deploy.sh
-
-# Copy the configuration once (deploy.sh never overwrites it)
-scp config/config.php <your-server>:/var/www/catenvis/config/
 ```
 
-The config must have `'base_url' => '/catenvis'` and valid database
-credentials (see `config/config.sample.php`).
+Then run the guided setup once on the server (via `ssh <your-server>`):
+
+```bash
+php /var/www/catenvis/bin/setup.php
+```
+
+It asks for the database and TMDB credentials, writes `config/config.php`,
+loads the schema and creates the first admin account (use `base_url`
+`/catenvis`). `deploy.sh` never touches `config/config.php` afterwards, so this
+is a one-time step. All options are documented in `config/config.sample.php`.
 
 ## 4. Enable the Apache config (on the server)
 

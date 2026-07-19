@@ -50,16 +50,16 @@ Series and episode data comes from [TMDB](https://www.themoviedb.org/).
 
 ## Installation
 
-1. **Database:** create a database and user and load the schema — the exact
-   statements are in the header of [`sql/schema.sql`](sql/schema.sql).
-2. **Configuration:** copy `config/config.sample.php` to `config/config.php`
-   (outside the web root, git-ignored) and fill in the database credentials,
-   the TMDB key, and `base_url`.
-3. **Dependencies:** run `composer install`.
+1. **Dependencies:** run `composer install`.
+2. **Database:** create an empty database and a user for it — the exact
+   `CREATE DATABASE` / `CREATE USER` / `GRANT` statements are in the header of
+   [`sql/schema.sql`](sql/schema.sql).
+3. **Guided setup:** run `php bin/setup.php`. It asks for the database and TMDB
+   credentials, writes `config/config.php`, loads the schema and creates the
+   first admin account — all options are documented in
+   `config/config.sample.php`.
 4. **Web server & cron:** point the web root at `html/` and set up the daily
    update cron. A full walkthrough is in [`deploy/SETUP.md`](deploy/SETUP.md).
-5. **First user:** create the initial admin with
-   `php bin/create_user.php <username> <password> --admin`.
 
 **Updating:** after pulling a new version, apply pending schema changes with
 `php bin/migrate.php` (idempotent; see

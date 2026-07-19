@@ -12,6 +12,7 @@ use Catenvis\Controller\ImportController;
 use Catenvis\Controller\LoginController;
 use Catenvis\Controller\SeriesController;
 use Catenvis\Controller\SettingsController;
+use Catenvis\Controller\StatsController;
 use Catenvis\Controller\WatchController;
 use Catenvis\Request;
 use Catenvis\Router;
@@ -30,6 +31,7 @@ $watch    = new WatchController($app);
 $admin    = new AdminController($app);
 $import   = new ImportController($app);
 $settings = new SettingsController($app);
+$stats    = new StatsController($app);
 
 $router = new Router();
 
@@ -42,8 +44,10 @@ $router->add('GET',  '/logout', [$login, 'logout']);
 $router->add('GET',  '/change-password', [$login, 'showChangePassword']);
 $router->add('POST', '/change-password', [$login, 'changePassword']);
 
-// Personal area (settings).
+// Personal area (settings, statistics).
 $router->add('GET', '/settings', [$settings, 'show']);
+$router->add('GET', '/stats',     [$stats, 'index']);
+$router->add('GET', '/stats/top', [$stats, 'topMore']);
 
 // Series.
 $router->add('GET',  '/',            [$dashboard, 'index']);

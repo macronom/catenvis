@@ -127,13 +127,14 @@ final class SeriesRepository {
 	public function upsertEpisode(array $data): void {
 		$this->db->execute(
 			'INSERT INTO episodes
-				(id, series_id, season_number, episode_number, air_date)
+				(id, series_id, season_number, episode_number, air_date, runtime)
 			 VALUES
-				(:id, :series_id, :season_number, :episode_number, :air_date)
+				(:id, :series_id, :season_number, :episode_number, :air_date, :runtime)
 			 ON DUPLICATE KEY UPDATE
 				air_date = VALUES(air_date),
 				season_number = VALUES(season_number),
-				episode_number = VALUES(episode_number)',
+				episode_number = VALUES(episode_number),
+				runtime = VALUES(runtime)',
 			$data
 		);
 	}
@@ -239,6 +240,20 @@ final class SeriesRepository {
 		$rows = $this->db->fetchAll(
 			"SELECT DISTINCT series_id FROM user_series WHERE status IN ('following','deferred')"
 		);
+
+		return array_map(static fn(array $r): int => (int) $r['series_id'], $rows);
+	}
+
+	/**
+	 * IDs of every series any user follows, defers OR has stopped - the full
+	 * set for a one-off backfill (e.g. of a newly added episode field like
+	 * runtime) that must also cover stopped series, which the nightly refresh
+	 * and --all deliberately skip.
+	 *
+	 * @return list<int>
+	 */
+	public function allSeriesIds(): array {
+		$rows = $this->db->fetchAll('SELECT DISTINCT series_id FROM user_series');
 
 		return array_map(static fn(array $r): int => (int) $r['series_id'], $rows);
 	}

@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 	season_number  SMALLINT UNSIGNED NOT NULL,
 	episode_number SMALLINT UNSIGNED NOT NULL,
 	air_date       DATE         NULL DEFAULT NULL,
+	runtime        SMALLINT UNSIGNED NULL DEFAULT NULL,
 	PRIMARY KEY (id),
 	UNIQUE KEY uq_episodes_number (series_id, season_number, episode_number),
 	KEY idx_episodes_series (series_id),
@@ -158,3 +159,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 --   INSERT INTO schema_migrations (migration) VALUES ('NNN_description.sql');
 INSERT INTO schema_migrations (migration) VALUES ('001_add_episode_overview.sql');
 INSERT INTO schema_migrations (migration) VALUES ('002_mark_unavailable_series.sql');
+INSERT INTO schema_migrations (migration) VALUES ('003_add_episode_runtime.sql');

@@ -10,6 +10,7 @@ namespace Catenvis;
 use Catenvis\Repository\ImportQueueRepository;
 use Catenvis\Repository\LoginAttemptRepository;
 use Catenvis\Repository\SeriesRepository;
+use Catenvis\Repository\StatsRepository;
 use Catenvis\Repository\UserRepository;
 use Catenvis\Repository\WatchRepository;
 
@@ -25,6 +26,7 @@ final class App {
 	public readonly UserRepository $users;
 	public readonly SeriesRepository $series;
 	public readonly WatchRepository $watch;
+	public readonly StatsRepository $stats;
 	public readonly ImportQueueRepository $importQueue;
 	public readonly LoginAttemptRepository $loginAttempts;
 
@@ -83,6 +85,7 @@ final class App {
 		$this->users  = new UserRepository($this->db);
 		$this->series = new SeriesRepository($this->db);
 		$this->watch  = new WatchRepository($this->db);
+		$this->stats  = new StatsRepository($this->db);
 		$this->importQueue = new ImportQueueRepository($this->db);
 		$this->loginAttempts = new LoginAttemptRepository($this->db);
 		$this->auth   = new Auth($this->users, $this->session, $sessionLifetime);
@@ -110,6 +113,17 @@ final class App {
 			// '%2$d. %1$s' -> '16. Jan.'. Resolved lazily via $this->t(),
 			// because the translator is created after this closure.
 			return $this->t('%1$s %2$d', $this->t($months[(int) date('n', $ts) - 1]), (int) date('j', $ts));
+		});
+		// Localized runtime, e.g. "3 d 4 h" / "12 h 30 min" / "45 min".
+		$this->view->share('duration', function (int $minutes): string {
+			$p = DurationFormat::parts($minutes);
+			if ($p['days'] > 0) {
+				return $this->t('%1$d d %2$d h', $p['days'], $p['hours']);
+			}
+			if ($p['hours'] > 0) {
+				return $this->t('%1$d h %2$d min', $p['hours'], $p['minutes']);
+			}
+			return $this->t('%d min', $p['minutes']);
 		});
 	}
 

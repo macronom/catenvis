@@ -34,6 +34,9 @@ Series and episode data comes from [TMDB](https://www.themoviedb.org/).
   one-click "watched" action right on the dashboard card
 - Defer series you want to keep but watch later ("on hold")
 - Add series via TMDB search; bulk import from an IMDb CSV export
+- Personal statistics page: your collection by follow and production status,
+  plus total time watched, remaining backlog, top series by time, and weekly
+  viewing activity
 - Multilingual content **and** interface (English, German, French, Spanish,
   Italian) with per-user language; the UI language is easy to extend via flat
   JSON catalogs in `lang/`

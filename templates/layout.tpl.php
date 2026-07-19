@@ -21,6 +21,7 @@
 				<a href="<?= $e($url('/')) ?>"><?= $e($t('My series')) ?></a>
 				<a href="<?= $e($url('/add')) ?>"><?= $e($t('Add series')) ?></a>
 				<a href="<?= $e($url('/import')) ?>"><?= $e($t('Import')) ?></a>
+				<a href="<?= $e($url('/stats')) ?>"><?= $e($t('Statistics')) ?></a>
 			<?php endif; ?>
 		</nav>
 	<?php endif; ?>

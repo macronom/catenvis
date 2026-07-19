@@ -44,17 +44,28 @@ $langs        = $users->activeContentLanguages($tmdb->baseLanguageCode());
 $episodeLangs = $users->activeEpisodeLanguages($tmdb->baseLanguageCode());
 $service      = new SeriesService($tmdb, $repo, $langs, $episodeLangs);
 
-// "--all" refreshes every followed series (e.g. for a one-off backfill),
-// otherwise only the ones due today (staggered or with a missing language).
+// "--all" refreshes every followed series; "--all-series" additionally covers
+// stopped ones (for a one-off backfill of a new episode field across the whole
+// history). Otherwise only the series due today (staggered / missing language).
 // "--force" additionally re-fetches every season in every active language
-// (to backfill fields added later, e.g. episode overviews).
+// (to backfill fields added later, e.g. episode overviews or runtime).
 $argv      = $_SERVER['argv'] ?? [];
+$allSeries = in_array('--all-series', $argv, true);
 $all       = in_array('--all', $argv, true);
 $force     = in_array('--force', $argv, true);
-$seriesIds = $all ? $repo->followedSeriesIds() : $repo->seriesDueForRefresh($langs, $episodeLangs);
-$now       = date('Y-m-d H:i:s');
+if ($allSeries) {
+	$seriesIds = $repo->allSeriesIds();
+	$scope     = 'all';
+} elseif ($all) {
+	$seriesIds = $repo->followedSeriesIds();
+	$scope     = 'followed';
+} else {
+	$seriesIds = $repo->seriesDueForRefresh($langs, $episodeLangs);
+	$scope     = 'due';
+}
+$now = date('Y-m-d H:i:s');
 
-printf("[%s] Updating %d %s series.\n", $now, count($seriesIds), $all ? 'followed' : 'due');
+printf("[%s] Updating %d %s series.\n", $now, count($seriesIds), $scope);
 
 $ok = 0;
 $failed = 0;

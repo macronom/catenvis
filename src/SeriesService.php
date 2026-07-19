@@ -191,6 +191,7 @@ final class SeriesService {
 				'season_number'  => (int) ($episode['season_number'] ?? $seasonNumber),
 				'episode_number' => (int) ($episode['episode_number'] ?? 0),
 				'air_date'       => $this->dateOrNull($episode['air_date'] ?? null),
+				'runtime'        => $this->intOrNull($episode['runtime'] ?? null),
 			]);
 			$this->series->upsertEpisodeTranslation(
 				$episodeId,
@@ -261,6 +262,21 @@ final class SeriesService {
 	private function stringOrNull(mixed $value): ?string {
 		if (is_string($value) && $value !== '') {
 			return $value;
+		}
+
+		return null;
+	}
+
+	/**
+	 * A positive integer (TMDB uses 0/null for an unknown episode runtime),
+	 * otherwise null so it does not distort the runtime averages.
+	 */
+	private function intOrNull(mixed $value): ?int {
+		if (is_int($value) && $value > 0) {
+			return $value;
+		}
+		if (is_string($value) && ctype_digit($value) && $value !== '0') {
+			return (int) $value;
 		}
 
 		return null;

@@ -185,9 +185,13 @@ final class StatsRepository {
 
 	/**
 	 * Watched minutes per ISO week over the last $weeks weeks (current week
-	 * included, missing weeks zero-filled). The user's very first activity day
-	 * (the initial bulk import) is excluded so it does not swamp the chart -
-	 * derived from the data, no stored baseline needed.
+	 * included, missing weeks zero-filled). Two kinds of non-viewing activity
+	 * are excluded so they do not swamp the chart, both derived from the data
+	 * (no stored baseline): the user's first activity day (the initial bulk
+	 * import), and bulk "watched" marks - episodes sharing one watched_at
+	 * timestamp, i.e. a whole season/series marked in a single action rather
+	 * than episode by episode. Their runtime still counts in the lifetime
+	 * totals (watchTotals), just not in this per-week activity curve.
 	 *
 	 * @return list<array{week_num: int, minutes: int, current: bool}>
 	 */
@@ -203,6 +207,8 @@ final class StatsRepository {
 			 WHERE w.user_id = ?
 			   AND w.watched_at >= ?
 			   AND DATE(w.watched_at) > (SELECT DATE(MIN(watched_at)) FROM user_watched WHERE user_id = ?)
+			   AND (SELECT COUNT(*) FROM user_watched w2
+					WHERE w2.user_id = w.user_id AND w2.watched_at = w.watched_at) = 1
 			 GROUP BY yw',
 			[$userId, $since, $userId]
 		);

@@ -17,6 +17,9 @@ final class DashboardController {
 	/** Number of followed series per page (the rest is loaded via "Load more"). */
 	private const PAGE_SIZE = 36;
 
+	/** Stopped series shown initially and per "Load more" page (secondary, so fewer). */
+	private const STOPPED_PAGE_SIZE = 12;
+
 	private App $app;
 
 	public function __construct(App $app) {
@@ -37,7 +40,7 @@ final class DashboardController {
 			'view'           => $view,
 			'following'      => $this->app->watch->seriesPage($userId, $sort, 'following', self::PAGE_SIZE, 0, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang),
 			'followingTotal' => $this->app->watch->countByFollowStatus($userId, 'following'),
-			'stopped'        => $this->app->watch->seriesPage($userId, $sort, 'stopped', self::PAGE_SIZE, 0, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang),
+			'stopped'        => $this->app->watch->seriesPage($userId, $sort, 'stopped', self::STOPPED_PAGE_SIZE, 0, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang),
 			'stoppedTotal'   => $this->app->watch->countByFollowStatus($userId, 'stopped'),
 			'unavailable'    => $this->app->series->unavailableForUser($userId, $this->app->contentLang),
 			'pageSize'       => self::PAGE_SIZE,
@@ -55,8 +58,9 @@ final class DashboardController {
 		$status = $request->getString('status') === 'stopped' ? 'stopped' : 'following';
 
 		$total = $this->app->watch->countByFollowStatus($userId, $status);
+		$pageLimit = $status === 'stopped' ? self::STOPPED_PAGE_SIZE : self::PAGE_SIZE;
 		// "Load all": all remaining series from the offset in a single call.
-		$limit = $request->getBool('all') ? max(1, $total) : self::PAGE_SIZE;
+		$limit = $request->getBool('all') ? max(1, $total) : $pageLimit;
 		$rows  = $this->app->watch->seriesPage($userId, $sort, $status, $limit, $offset, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang);
 
 		$html = '';

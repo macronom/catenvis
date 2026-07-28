@@ -43,7 +43,7 @@ a:hover { color: var(--accent-hover); }
 .nav a:hover { color: var(--text); }
 .userbox { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.9rem; margin-left: auto; }
 
-.content { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.content { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.25rem 0; }
 .footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 1.5rem; }
 .footer .tmdb-disclaimer { margin-top: 0.35rem; font-size: 0.75rem; opacity: 0.75; }
 
@@ -322,6 +322,9 @@ input[type="text"], input[type="password"], input[type="search"] {
 /* Statistics page */
 .stats-section { margin-bottom: 2.75rem; }
 .stats-section > h2 { margin: 0 0 0.15rem; font-size: 1.15rem; }
+/* When content follows the heading directly (no sub-line), keep breathing room. */
+.stats-section > h2 + .stats-grid,
+.stats-section > h2 + .top-list { margin-top: 1rem; }
 .stats-sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 1rem; }
 .subhead { color: var(--muted); font-size: 0.85rem; margin: 1.1rem 0 0.5rem; }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
@@ -329,8 +332,7 @@ input[type="text"], input[type="password"], input[type="search"] {
 .stat-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
 .stat-card .label { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
 .stat-card.accent { border-color: rgba(63, 140, 255, 0.5); background: rgba(63, 140, 255, 0.08); }
-.stat-card.accent .num { color: var(--accent); }
-.dist-bar { display: flex; height: 16px; border-radius: 999px; overflow: hidden; margin: 0.2rem 0 0.55rem; border: 1px solid var(--border); }
+.dist-bar { display: flex; height: 16px; overflow: hidden; margin: 0.2rem 0 0.55rem; border: 1px solid var(--border); }
 .dist-bar span { display: block; }
 .dist-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1.2rem; color: var(--muted); font-size: 0.8rem; }
 .dist-legend i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 3px; margin-right: 0.35rem; vertical-align: middle; }
@@ -342,10 +344,10 @@ input[type="text"], input[type="password"], input[type="search"] {
 .top-list .tmin { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 .top-list .bar { grid-column: 2 / 4; height: 5px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin-top: 0.3rem; }
 .top-list .bar > span { display: block; height: 100%; background: var(--accent); }
-.activity { display: flex; align-items: flex-end; gap: 0.5rem; height: 140px; padding-top: 0.5rem; }
+.activity { display: flex; align-items: flex-end; gap: 0.5rem; height: 140px; padding-top: 0.5rem; max-width: 480px; }
 .activity .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0.3rem; height: 100%; }
 .activity .col .val { font-size: 0.7rem; color: var(--muted); }
-.activity .col .bar { width: 66%; max-width: 34px; background: var(--airing); border-radius: 4px 4px 0 0; min-height: 2px; }
+.activity .col .bar { width: 66%; max-width: 34px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
 .activity .col .wk { color: var(--muted); font-size: 0.7rem; text-align: center; }
 /* Plain text-like "more" control (overrides the global button styling). */
 .more-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }

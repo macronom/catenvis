@@ -8,7 +8,6 @@
 
 <section class="stats-section">
 	<h2><?= $e($t('Your collection')) ?></h2>
-	<p class="stats-sub"><?= $e($t('A snapshot of the series you follow.')) ?></p>
 	<div class="stats-grid">
 		<div class="stat-card"><div class="num"><?= (int) $collection['following'] ?></div><div class="label"><?= $e($t('Following')) ?></div></div>
 		<div class="stat-card"><div class="num"><?= (int) $collection['deferred'] ?></div><div class="label"><?= $e($t('Deferred')) ?></div></div>
@@ -29,7 +28,7 @@
 	}
 	?>
 	<?php if ($prodTotal > 0): ?>
-		<p class="subhead"><?= $e($t('Production status of your active series')) ?></p>
+		<p class="subhead"><?= $e($t('Production status of your followed series')) ?></p>
 		<div class="dist-bar">
 			<?php foreach ($prod as $p): ?>
 				<?php if ((int) $collection[$p[0]] > 0): ?>
@@ -54,23 +53,6 @@
 		<div class="stat-card"><div class="num"><?= (int) $watch['episodes'] ?></div><div class="label"><?= $e($t('Episodes watched')) ?></div></div>
 		<div class="stat-card"><div class="num"><?= (int) $completed ?></div><div class="label"><?= $e($t('Series fully watched')) ?></div></div>
 	</div>
-	<?php if (!empty($top)): ?>
-		<p class="subhead"><?= $e($t('Top series by time')) ?></p>
-		<?php $maxMin = (int) ($top[0]['minutes'] ?? 0); ?>
-		<ul class="top-list" id="top-list">
-			<?php foreach ($top as $i => $row): ?>
-				<?= $app->view->capture('_partials/stat_top_row', ['row' => $row, 'rank' => (int) $i + 1, 'max' => $maxMin]) ?>
-			<?php endforeach; ?>
-		</ul>
-		<?php if (!empty($topHasMore)): ?>
-			<div class="load-more-wrap" id="top-more"
-				data-url="<?= $e($url('/stats/top')) ?>"
-				data-offset="<?= count($top) ?>"
-				data-max="<?= $maxMin ?>">
-				<button type="button" class="more-link"><?= $e($t('Show more')) ?></button>
-			</div>
-		<?php endif; ?>
-	<?php endif; ?>
 </section>
 
 <section class="stats-section">
@@ -89,6 +71,26 @@
 	</div>
 	<p class="stats-sub" style="margin-top:1rem"><?= $e($t('Period: last %d weeks', (int) $activityWeeks)) ?></p>
 </section>
+
+<?php if (!empty($top)): ?>
+<section class="stats-section">
+	<h2><?= $e($t('Top series by time')) ?></h2>
+	<?php $maxMin = (int) ($top[0]['minutes'] ?? 0); ?>
+	<ul class="top-list" id="top-list">
+		<?php foreach ($top as $i => $row): ?>
+			<?= $app->view->capture('_partials/stat_top_row', ['row' => $row, 'rank' => (int) $i + 1, 'max' => $maxMin]) ?>
+		<?php endforeach; ?>
+	</ul>
+	<?php if (!empty($topHasMore)): ?>
+		<div class="load-more-wrap" id="top-more"
+			data-url="<?= $e($url('/stats/top')) ?>"
+			data-offset="<?= count($top) ?>"
+			data-max="<?= $maxMin ?>">
+			<button type="button" class="more-link"><?= $e($t('Show more')) ?></button>
+		</div>
+	<?php endif; ?>
+</section>
+<?php endif; ?>
 
 <?php if (!empty($topHasMore)): ?>
 <script nonce="<?= $e($cspNonce) ?>">

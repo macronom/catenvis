@@ -57,10 +57,15 @@ final class WatchRepository {
 		// Whitelist – no user input directly in ORDER BY.
 		// Group 2 = "coming soon": more episodes announced OR no episode aired yet.
 		// Deferred series form group 3 – behind the announced ones, before the rest.
-		$isSoon    = 'unseen_count = 0 AND (aired_count = 0 OR upcoming_count > 0 OR s.next_air_date IS NOT NULL)';
+		// The TMDB field next_air_date is only meaningful while it lies ahead: once
+		// that episode has aired the series drops out of the daily refresh class,
+		// so a stale past date can linger for days. Treat it as absent then –
+		// otherwise a series that is fully caught up would rank as "coming soon".
+		$nextAir   = 'CASE WHEN s.next_air_date >= CURDATE() THEN s.next_air_date END';
+		$isSoon    = "unseen_count = 0 AND (aired_count = 0 OR upcoming_count > 0 OR $nextAir IS NOT NULL)";
 		$groupRank = "CASE WHEN us.status = 'deferred' THEN 3 WHEN unseen_count > 0 THEN 1 WHEN $isSoon THEN 2 ELSE 4 END";
 		// Next airing: TMDB field, otherwise the earliest future episode.
-		$nextKey   = 'COALESCE(s.next_air_date, next_ep)';
+		$nextKey   = "COALESCE($nextAir, next_ep)";
 		// Most recent actually aired episode (from episodes), otherwise the TMDB field.
 		// The series field last_air_date is often NULL or stale.
 		$lastAiredKey = 'COALESCE(last_aired, s.last_air_date)';

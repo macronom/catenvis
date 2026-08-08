@@ -75,7 +75,12 @@ $statusAction = static function (string $status, string $label, string $class = 
 					</p>
 				<?php endif; ?>
 			</div>
-			<?php if (!empty($series['next_air_date'])): ?><p class="next"><?= $e($t('Next episode:')) ?> <?= $e($series['next_air_date']) ?></p><?php endif; ?>
+			<?php
+			// Only announce a date that still lies ahead: after the episode aired
+			// the TMDB field stays stale until the next sync of this series.
+			$nextAir = (string) ($series['next_air_date'] ?? '');
+			?>
+			<?php if ($nextAir !== '' && $nextAir >= date('Y-m-d')): ?><p class="next"><?= $e($t('Next episode:')) ?> <?= $e($nextAir) ?></p><?php endif; ?>
 			<?php if (!empty($series['overview'])): ?><p class="overview"><?= $e($series['overview']) ?></p><?php endif; ?>
 
 			<p class="ext-links">

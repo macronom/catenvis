@@ -9,6 +9,9 @@
  */
 $aired    = (int) $row['aired_count'];
 $watched  = (int) $row['watched_count'];
+// Episodes marked watched ahead of a wrong/missing TMDB air date count as
+// aired, so progress never shows more watched than aired episodes.
+$aired    = max($aired, $watched);
 $unseen   = (int) $row['unseen_count'];
 $upcoming = (int) ($row['upcoming_count'] ?? 0);
 $percent  = $aired > 0 ? (int) round($watched / $aired * 100) : 0;

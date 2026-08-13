@@ -105,16 +105,22 @@ final class WatchRepository {
 		$statusCond = $status === 'following'
 			? "us.status IN ('following','deferred')"
 			: 'us.status = :status';
+		// "Upcoming" excludes episodes the user already marked watched:
+		// marking is allowed ahead of a wrong TMDB air date, and such an
+		// episode must no longer count into badges or next-airing dates.
 		$params = [
 			'lang_user'        => $userLang,
 			'lang_ep_user'     => $userLang,
 			'lang_ep_base'     => $baseLang,
+			'uid_upcoming'     => $userId,
+			'uid_next_ep'      => $userId,
 			'uid_watched'      => $userId,
 			'uid_unseen'       => $userId,
 			'uid_next_season'  => $userId,
 			'uid_next_episode' => $userId,
 			'uid_next_id'      => $userId,
 			'uid_next_name'    => $userId,
+			'uid_next_up'      => $userId,
 			'uid_where'        => $userId,
 		];
 		// Native prepares do not allow surplus parameters – :lang_title
@@ -135,10 +141,14 @@ final class WatchRepository {
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()) AS aired_count,
 				(SELECT COUNT(*) FROM episodes e
 					WHERE e.series_id = s.id
-					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()) AS upcoming_count,
+					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()
+					  AND NOT EXISTS (SELECT 1 FROM user_watched w
+						WHERE w.user_id = :uid_upcoming AND w.episode_id = e.id)) AS upcoming_count,
 				(SELECT MIN(e.air_date) FROM episodes e
 					WHERE e.series_id = s.id
-					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()) AS next_ep,
+					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()
+					  AND NOT EXISTS (SELECT 1 FROM user_watched w
+						WHERE w.user_id = :uid_next_ep AND w.episode_id = e.id)) AS next_ep,
 				(SELECT MAX(e.air_date) FROM episodes e
 					WHERE e.series_id = s.id
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()) AS last_aired,
@@ -179,6 +189,8 @@ final class WatchRepository {
 				(SELECT e.episode_number FROM episodes e
 					WHERE e.series_id = s.id
 					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()
+					  AND NOT EXISTS (SELECT 1 FROM user_watched w
+						WHERE w.user_id = :uid_next_up AND w.episode_id = e.id)
 					ORDER BY e.air_date, e.season_number, e.episode_number LIMIT 1) AS next_up_episode
 			 FROM user_series us
 			 JOIN series s ON s.id = us.series_id

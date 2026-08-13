@@ -54,7 +54,8 @@ final class StatsRepository {
 
 		// Per-following-series badge signals (unseen aired count, upcoming
 		// count, the next upcoming episode number - E01 = a new season), then
-		// bucketed exactly like the dashboard badges.
+		// bucketed exactly like the dashboard badges. Like there, "upcoming"
+		// skips episodes already marked watched ahead of a wrong TMDB date.
 		$prod = $this->db->fetchOne(
 			"SELECT
 				SUM(pstatus = 'Returning Series' AND (unseen > 0 OR (upcoming > 0 AND COALESCE(next_ep, 0) <> 1))) AS airing,
@@ -68,14 +69,16 @@ final class StatsRepository {
 					(SELECT COUNT(*) FROM episodes e
 						WHERE e.series_id = s.id AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 						  AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)) AS unseen,
-					(SELECT COUNT(*) FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE()) AS upcoming,
+					(SELECT COUNT(*) FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE()
+						AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)) AS upcoming,
 					(SELECT e.episode_number FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE()
+						AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)
 						ORDER BY e.air_date, e.season_number, e.episode_number LIMIT 1) AS next_ep
 				FROM user_series us
 				JOIN series s ON s.id = us.series_id
 				WHERE us.user_id = ? AND us.status = 'following'
 			 ) t",
-			[$userId, $userId]
+			[$userId, $userId, $userId, $userId]
 		);
 
 		return [

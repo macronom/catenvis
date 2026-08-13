@@ -120,7 +120,9 @@ $statusAction = static function (string $status, string $label, string $class = 
 		$unseenAired = 0;
 		foreach ($episodes as $ep) {
 			$seen  = isset($watched[(int) $ep['id']]);
-			$aired = !empty($ep['air_date']) && $ep['air_date'] <= $today;
+			// A watched episode counts as aired here: TMDB dates are sometimes
+			// wrong, so marking is allowed ahead of the official air date.
+			$aired = $seen || (!empty($ep['air_date']) && $ep['air_date'] <= $today);
 			if ($seen) {
 				$seenInSeason++;
 			}
@@ -168,11 +170,13 @@ $statusAction = static function (string $status, string $label, string $class = 
 						<?php endif; ?>
 						<span class="ep-date"><?= $epDate ?></span>
 						<span class="ep-toggle">
-							<?php if (!$aired && !$isSeen): ?>
-								<span class="upcoming-label"><?= $e($t('upcoming')) ?></span>
-							<?php elseif ($isSeen): ?>
+							<?php if ($isSeen): ?>
 								<?= $watchAction('episode', ['episode_id' => (string) $epId], 'unwatch', $t('✓ watched'), 'btn-check seen') ?>
 							<?php else: ?>
+								<?php // TMDB air dates are sometimes wrong, so unaired episodes stay markable. ?>
+								<?php if (!$aired): ?>
+									<span class="upcoming-label"><?= $e($t('upcoming')) ?></span>
+								<?php endif; ?>
 								<?= $watchAction('episode', ['episode_id' => (string) $epId], 'watch', $t('mark watched'), 'btn-check') ?>
 							<?php endif; ?>
 						</span>

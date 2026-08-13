@@ -271,7 +271,7 @@ input[type="text"], input[type="password"], input[type="search"] {
 .episode .ep-num { color: var(--muted); font-variant-numeric: tabular-nums; }
 .episode .ep-name { min-width: 0; }
 .episode .ep-date { color: var(--muted); font-size: 0.85rem; }
-.episode .ep-toggle { justify-self: end; }
+.episode .ep-toggle { justify-self: end; display: inline-flex; align-items: center; gap: 0.6rem; }
 .episode.seen { color: var(--muted); }
 .episode.unseen .ep-name { font-weight: 600; }
 .episode.upcoming { opacity: 0.55; }

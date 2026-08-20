@@ -40,10 +40,14 @@ final class WatchRepository {
 	/**
 	 * A (optionally limited) page of a user's series with progress data.
 	 *
-	 * @param string   $sort   'name' sorts alphabetically, otherwise in groups
-	 *                          (1: unseen episodes, 2: coming soon, 3: deferred, 4: rest).
-	 *                          Groups 1, 3 & 4: most recently aired episode first;
-	 *                          group 2: next upcoming airing first.
+	 * @param string   $sort   'name' sorts alphabetically, otherwise by dashboard
+	 *                          badge (1: red = aired episodes to watch, 2: violet =
+	 *                          running season with more episodes coming, 3: blue =
+	 *                          waiting for a season premiere, 4: yellow = deferred,
+	 *                          5: no badge = fully caught up). Groups 2 & 3: next
+	 *                          upcoming airing first; the others: most recently
+	 *                          aired episode first (the rest group additionally
+	 *                          puts running series before ended/canceled ones).
 	 * @param string   $status Follow status; 'following' also covers deferred
 	 *                          series ('deferred'), 'stopped' only stopped ones.
 	 * @param int|null $limit  Maximum count (null = unlimited).
@@ -55,17 +59,18 @@ final class WatchRepository {
 	 */
 	public function seriesPage(int $userId, string $sort, string $status, ?int $limit = null, int $offset = 0, string $titleLang = 'en', string $userLang = 'en', string $baseLang = 'en'): array {
 		// Whitelist – no user input directly in ORDER BY.
-		// Group 2 = "coming soon": more episodes announced OR no episode aired yet.
-		// Deferred series form group 3 – behind the announced ones, before the rest.
-		// The TMDB field next_air_date is only meaningful while it lies ahead: once
-		// that episode has aired the series drops out of the daily refresh class,
-		// so a stale past date can linger for days. Treat it as absent then –
-		// otherwise a series that is fully caught up would rank as "coming soon".
-		$nextAir   = 'CASE WHEN s.next_air_date >= CURDATE() THEN s.next_air_date END';
-		$isSoon    = "unseen_count = 0 AND (aired_count = 0 OR upcoming_count > 0 OR $nextAir IS NOT NULL)";
-		$groupRank = "CASE WHEN us.status = 'deferred' THEN 3 WHEN unseen_count > 0 THEN 1 WHEN $isSoon THEN 2 ELSE 4 END";
-		// Next airing: TMDB field, otherwise the earliest future episode.
-		$nextKey   = "COALESCE($nextAir, next_ep)";
+		// The default order mirrors the dashboard badges exactly: only what a
+		// card shows may rank it. upcoming_count/next_ep/next_up_episode
+		// already exclude episodes marked watched ahead of a wrong TMDB air
+		// date, and the TMDB series field next_air_date is deliberately not
+		// consulted at all - it can be stale (past) or plain wrong, and must
+		// not rank a fully caught-up, badge-less series as "coming soon".
+		$hasUpcoming = 'unseen_count = 0 AND upcoming_count > 0';
+		$groupRank   = "CASE WHEN us.status = 'deferred' THEN 4"
+			. ' WHEN unseen_count > 0 THEN 1'
+			. " WHEN $hasUpcoming AND COALESCE(next_up_episode, 0) <> 1 THEN 2"
+			. " WHEN $hasUpcoming THEN 3"
+			. ' ELSE 5 END';
 		// Most recent actually aired episode (from episodes), otherwise the TMDB field.
 		// The series field last_air_date is often NULL or stale.
 		$lastAiredKey = 'COALESCE(last_aired, s.last_air_date)';
@@ -83,13 +88,12 @@ final class WatchRepository {
 			: $userTitle;
 
 		$defaultOrder = $groupRank
-			// Group 2: earliest upcoming airing first, series without a date go to the end.
-			. ", CASE WHEN $isSoon THEN ($nextKey IS NULL) END ASC"
-			. ", CASE WHEN $isSoon THEN $nextKey END ASC"
+			// Violet & blue: earliest upcoming airing first (never NULL there).
+			. ", CASE WHEN $hasUpcoming THEN next_ep END ASC"
 			// Rest group: running ones at the top, ended/canceled at the bottom.
-			. ", CASE WHEN unseen_count = 0 AND NOT ($isSoon) THEN $statusRank END ASC"
-			// Groups 1 & 3: most recently aired episode first.
-			. ", CASE WHEN NOT ($isSoon) THEN $lastAiredKey END DESC"
+			. ", CASE WHEN unseen_count = 0 AND upcoming_count = 0 THEN $statusRank END ASC"
+			// Red, yellow & rest: most recently aired episode first.
+			. ", CASE WHEN NOT ($hasUpcoming) THEN $lastAiredKey END DESC"
 			. ", $titleExpr";
 
 		$orderBy = $sort === 'name' ? $titleExpr : $defaultOrder;

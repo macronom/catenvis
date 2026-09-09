@@ -344,10 +344,10 @@ input[type="text"], input[type="password"], input[type="search"] {
 .top-list .tmin { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 .top-list .bar { grid-column: 2 / 4; height: 5px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin-top: 0.3rem; }
 .top-list .bar > span { display: block; height: 100%; background: var(--accent); }
-.activity { display: flex; align-items: flex-end; gap: 0.5rem; height: 140px; padding-top: 0.5rem; max-width: 480px; }
-.activity .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0.3rem; height: 100%; }
+.activity { display: flex; align-items: flex-end; gap: 0.5rem; padding-top: 0.5rem; max-width: 480px; }
+.activity .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
 .activity .col .val { font-size: 0.7rem; color: var(--muted); }
-.activity .col .bar { width: 66%; max-width: 34px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
+.activity .col .bar { width: 66%; max-width: 34px; flex-shrink: 0; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
 .activity .col .wk { color: var(--muted); font-size: 0.7rem; text-align: center; }
 /* Plain text-like "more" control (overrides the global button styling). */
 .more-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }

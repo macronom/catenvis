@@ -109,7 +109,7 @@ input[type="text"], input[type="password"], input[type="search"] {
 .sort-switch a.active { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
 .settings .sort-switch { margin-bottom: 1rem; flex-wrap: wrap; }
 .settings .sort-switch span { min-width: 6rem; }
-.settings-password { margin-top: 2rem; }
+.settings-links { margin-top: 2rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
 .user-link { color: var(--muted); }
 .user-link:hover { color: var(--text); }
 .logout-link { color: var(--muted); display: inline-flex; align-items: center; }

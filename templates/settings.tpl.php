@@ -35,5 +35,10 @@
 		</div>
 	<?php endif; ?>
 
-	<p class="settings-password"><a href="<?= $e($url('/change-password')) ?>"><?= $e($t('Change password')) ?></a></p>
+	<div class="settings-links">
+		<?php if (!$auth->isAdmin()): ?>
+			<a href="<?= $e($url('/import')) ?>"><?= $e($t('Import series from IMDb')) ?></a>
+		<?php endif; ?>
+		<a href="<?= $e($url('/change-password')) ?>"><?= $e($t('Change password')) ?></a>
+	</div>
 </section>

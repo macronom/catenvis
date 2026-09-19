@@ -10,6 +10,7 @@
 	--success: #30a46c;
 	--airing: #8b5cf6;
 	--deferred: #e08a3c;
+	--ended: #6c6f7b;
 	--border: #313847;
 	--radius: 10px;
 }
@@ -332,7 +333,8 @@ input[type="text"], input[type="password"], input[type="search"] {
 .stat-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
 .stat-card .label { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
 .stat-card.accent { border-color: rgba(63, 140, 255, 0.5); background: rgba(63, 140, 255, 0.08); }
-.dist-bar { display: flex; height: 16px; overflow: hidden; margin: 0.2rem 0 0.55rem; border: 1px solid var(--border); }
+.dist-bars { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.2rem 0 0.55rem; }
+.dist-bar { display: flex; height: 16px; overflow: hidden; border: 1px solid var(--border); }
 .dist-bar span { display: block; }
 .dist-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1.2rem; color: var(--muted); font-size: 0.8rem; }
 .dist-legend i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 3px; margin-right: 0.35rem; vertical-align: middle; }

@@ -19,7 +19,7 @@
 		['soon',         $t('Coming soon'),      'var(--airing)'],
 		['inproduction', $t('In production'),    'var(--accent)'],
 		['idle',         $t('Inactive'),         'var(--deferred)'],
-		['ended',        $t('Ended'),            'var(--surface-2)'],
+		['ended',        $t('Ended'),            'var(--ended)'],
 		['canceled',     $t('Canceled'),         'var(--danger)'],
 	];
 	$prodTotal = 0;
@@ -29,10 +29,31 @@
 	?>
 	<?php if ($prodTotal > 0): ?>
 		<p class="subhead"><?= $e($t('Production status of your followed series')) ?></p>
-		<div class="dist-bar">
-			<?php foreach ($prod as $p): ?>
-				<?php if ((int) $collection[$p[0]] > 0): ?>
-					<span style="width: <?= 100 * (int) $collection[$p[0]] / $prodTotal ?>%; background: <?= $p[2] ?>"></span>
+		<?php
+		// Two stacked bars: still-active series on top, finished (ended/canceled)
+		// below. The larger group spans the full width, the other one is
+		// shortened in proportion.
+		$prodGroups = [array_slice($prod, 0, 4), array_slice($prod, 4)];
+		$groupTotals = [];
+		foreach ($prodGroups as $i => $group) {
+			$groupTotals[$i] = 0;
+			foreach ($group as $p) {
+				$groupTotals[$i] += (int) $collection[$p[0]];
+			}
+		}
+		$largestGroup = max($groupTotals);
+		?>
+		<div class="dist-bars">
+			<?php foreach ($prodGroups as $i => $group): ?>
+				<?php $groupTotal = $groupTotals[$i]; ?>
+				<?php if ($groupTotal > 0): ?>
+					<div class="dist-bar" style="width: <?= 100 * $groupTotal / $largestGroup ?>%">
+						<?php foreach ($group as $p): ?>
+							<?php if ((int) $collection[$p[0]] > 0): ?>
+								<span style="width: <?= 100 * (int) $collection[$p[0]] / $groupTotal ?>%; background: <?= $p[2] ?>"></span>
+							<?php endif; ?>
+						<?php endforeach; ?>
+					</div>
 				<?php endif; ?>
 			<?php endforeach; ?>
 		</div>

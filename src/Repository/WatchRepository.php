@@ -20,6 +20,22 @@ final class WatchRepository {
 	}
 
 	/**
+	 * SQL condition that drops episodes of seasons the user chose to ignore.
+	 *
+	 * Correlates with the outer query (no bound parameters needed), so it
+	 * can be appended to any subquery that has an episode alias and a
+	 * user_series alias in scope.
+	 *
+	 * @param string $episodeAlias Alias of the episodes table.
+	 * @param string $followAlias  Alias of the user_series table.
+	 */
+	public static function notIgnoredSql(string $episodeAlias = 'e', string $followAlias = 'us'): string {
+		return " AND NOT EXISTS (SELECT 1 FROM user_ignored_seasons ign
+			WHERE ign.user_id = $followAlias.user_id AND ign.series_id = $episodeAlias.series_id
+			  AND ign.season_number = $episodeAlias.season_number)";
+	}
+
+	/**
 	 * Number of a user's series with the given follow status;
 	 * 'following' includes deferred series.
 	 */
@@ -105,6 +121,9 @@ final class WatchRepository {
 			$limitSql = ' LIMIT ' . max(0, $limit) . ' OFFSET ' . max(0, $offset);
 		}
 
+		// Seasons the user ignores count neither as open nor as progress.
+		$notIgnored = self::notIgnoredSql();
+
 		// The "following" section also covers deferred series.
 		$statusCond = $status === 'following'
 			? "us.status IN ('following','deferred')"
@@ -141,15 +160,15 @@ final class WatchRepository {
 				COALESCE(NULLIF(tul.name, \'\'), NULLIF(ten.name, \'\'), s.original_name) AS name,
 				ten.name AS title_en,
 				(SELECT COUNT(*) FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()) AS aired_count,
 				(SELECT COUNT(*) FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_upcoming AND w.episode_id = e.id)) AS upcoming_count,
 				(SELECT MIN(e.air_date) FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_next_ep AND w.episode_id = e.id)) AS next_ep,
@@ -158,26 +177,26 @@ final class WatchRepository {
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()) AS last_aired,
 				(SELECT COUNT(*) FROM episodes e
 					JOIN user_watched w ON w.episode_id = e.id AND w.user_id = :uid_watched
-					WHERE e.series_id = s.id) AS watched_count,
+					WHERE e.series_id = s.id' . $notIgnored . ') AS watched_count,
 				(SELECT COUNT(*) FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_unseen AND w.episode_id = e.id)) AS unseen_count,
 				(SELECT e.season_number FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_next_season AND w.episode_id = e.id)
 					ORDER BY e.season_number, e.episode_number LIMIT 1) AS next_unseen_season,
 				(SELECT e.episode_number FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_next_episode AND w.episode_id = e.id)
 					ORDER BY e.season_number, e.episode_number LIMIT 1) AS next_unseen_episode,
 				(SELECT e.id FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_next_id AND w.episode_id = e.id)
@@ -185,13 +204,13 @@ final class WatchRepository {
 				(SELECT COALESCE(NULLIF(etu.name, \'\'), NULLIF(etb.name, \'\')) FROM episodes e
 					LEFT JOIN episode_translations etu ON etu.episode_id = e.id AND etu.lang = :lang_ep_user
 					LEFT JOIN episode_translations etb ON etb.episode_id = e.id AND etb.lang = :lang_ep_base
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_next_name AND w.episode_id = e.id)
 					ORDER BY e.season_number, e.episode_number LIMIT 1) AS next_unseen_name,
 				(SELECT e.episode_number FROM episodes e
-					WHERE e.series_id = s.id
+					WHERE e.series_id = s.id' . $notIgnored . '
 					  AND e.air_date IS NOT NULL AND e.air_date > CURDATE()
 					  AND NOT EXISTS (SELECT 1 FROM user_watched w
 						WHERE w.user_id = :uid_next_up AND w.episode_id = e.id)
@@ -268,15 +287,54 @@ final class WatchRepository {
 	}
 
 	/**
-	 * Marks all already aired episodes of a series as watched.
+	 * Marks all already aired episodes of a series as watched, except
+	 * those in seasons the user ignores.
 	 */
 	public function markSeries(int $userId, int $seriesId): void {
 		$this->db->execute(
 			'INSERT IGNORE INTO user_watched (user_id, episode_id)
 			 SELECT ?, e.id FROM episodes e
 			 WHERE e.series_id = ?
-			   AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()',
+			   AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
+			   AND NOT EXISTS (SELECT 1 FROM user_ignored_seasons ign
+				   WHERE ign.user_id = ? AND ign.series_id = e.series_id
+					 AND ign.season_number = e.season_number)',
+			[$userId, $seriesId, $userId]
+		);
+	}
+
+	/**
+	 * Season numbers of a series the user ignores.
+	 *
+	 * @return list<int>
+	 */
+	public function ignoredSeasons(int $userId, int $seriesId): array {
+		$rows = $this->db->fetchAll(
+			'SELECT season_number FROM user_ignored_seasons
+			 WHERE user_id = ? AND series_id = ? ORDER BY season_number',
 			[$userId, $seriesId]
+		);
+
+		return array_map(static fn(array $r): int => (int) $r['season_number'], $rows);
+	}
+
+	/**
+	 * Ignores a season (it no longer counts as open) or counts it again.
+	 * The user must follow the series: for any other series the foreign key
+	 * rejects the row (silently, as INSERT IGNORE turns it into a warning).
+	 */
+	public function setSeasonIgnored(int $userId, int $seriesId, int $seasonNumber, bool $ignored): void {
+		if ($ignored) {
+			$this->db->execute(
+				'INSERT IGNORE INTO user_ignored_seasons (user_id, series_id, season_number) VALUES (?, ?, ?)',
+				[$userId, $seriesId, $seasonNumber]
+			);
+			return;
+		}
+
+		$this->db->execute(
+			'DELETE FROM user_ignored_seasons WHERE user_id = ? AND series_id = ? AND season_number = ?',
+			[$userId, $seriesId, $seasonNumber]
 		);
 	}
 

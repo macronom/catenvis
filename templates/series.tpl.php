@@ -19,6 +19,15 @@ $watchAction = static function (string $scope, array $extra, string $action, str
 		. '<button type="submit" class="' . $e($class) . '">' . $e($label) . '</button>'
 		. '</form>';
 };
+$ignoreAction = static function (int $season, string $action, string $label) use ($e, $url, $csrf, $series): string {
+	return '<form method="post" action="' . $e($url('/season-ignore')) . '" class="inline-form">'
+		. '<input type="hidden" name="_csrf" value="' . $e($csrf) . '">'
+		. '<input type="hidden" name="series_id" value="' . (int) $series['id'] . '">'
+		. '<input type="hidden" name="season_number" value="' . $season . '">'
+		. '<input type="hidden" name="action" value="' . $e($action) . '">'
+		. '<button type="submit" class="btn-small btn-ghost">' . $e($label) . '</button>'
+		. '</form>';
+};
 $statusAction = static function (string $status, string $label, string $class = '') use ($e, $url, $csrf, $series): string {
 	$classAttr = $class !== '' ? ' class="' . $e($class) . '"' : '';
 	return '<form method="post" action="' . $e($url('/follow')) . '" class="inline-form">'
@@ -137,15 +146,27 @@ $statusAction = static function (string $status, string $label, string $class = 
 		$hasUpcoming = $airedInSeason < count($episodes);
 		// Nur abgeschlossene, komplett gesehene Staffeln werden zugeklappt.
 		$fullyWatched = $unseenAired === 0 && $seenInSeason > 0 && !$hasUpcoming;
+		// Ignored seasons never count as open: always collapsed and dimmed.
+		$isIgnored = isset($ignored[(int) $seasonNumber]);
+		$seasonClass = $isIgnored ? ' ignored' : ($fullyWatched ? ' done' : '');
 		?>
-		<details class="season<?= $fullyWatched ? ' done' : '' ?>"<?= $fullyWatched ? '' : ' open' ?>>
+		<details class="season<?= $seasonClass ?>"<?= ($fullyWatched || $isIgnored) ? '' : ' open' ?>>
 			<summary class="season-head">
 				<h2><?= $e($t('Season %d', (int) $seasonNumber)) ?></h2>
-				<span class="season-progress"><?= $e($t('%1$d / %2$d watched', $seenInSeason, $airedInSeason)) ?><?php if ($unseenAired > 0): ?><?= $e($t(' · %d new', $unseenAired)) ?><?php endif; ?></span>
+				<?php if ($isIgnored): ?>
+					<span class="season-progress"><?= $e($t('ignored')) ?></span>
+				<?php else: ?>
+					<span class="season-progress"><?= $e($t('%1$d / %2$d watched', $seenInSeason, $airedInSeason)) ?><?php if ($unseenAired > 0): ?><?= $e($t(' · %d new', $unseenAired)) ?><?php endif; ?></span>
+				<?php endif; ?>
 			</summary>
 			<div class="actions season-actions">
 				<?= $watchAction('season', ['season_number' => (string) $seasonNumber], 'watch', $t('Season watched'), 'btn-small') ?>
 				<?= $watchAction('season', ['season_number' => (string) $seasonNumber], 'unwatch', $t('reset'), 'btn-small btn-ghost') ?>
+				<?php if ($followStatus !== null): ?>
+					<?= $isIgnored
+						? $ignoreAction((int) $seasonNumber, 'count', $t('Count again'))
+						: $ignoreAction((int) $seasonNumber, 'ignore', $t('Ignore season')) ?>
+				<?php endif; ?>
 			</div>
 			<ul class="episode-list">
 				<?php foreach ($episodes as $ep): ?>

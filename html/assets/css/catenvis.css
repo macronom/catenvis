@@ -262,6 +262,8 @@ input[type="text"], input[type="password"], input[type="search"] {
 .season-progress { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
 .season.done > .season-head { opacity: 0.7; }
 .season.done > .season-head h2 { font-weight: 500; }
+.season.ignored > .season-head { opacity: 0.45; }
+.season.ignored > .season-head h2 { font-weight: 500; }
 .season-actions { margin-bottom: 0.5rem; }
 /* Episode list as a grid so number / title / date / action columns line up
    across all rows without magic widths - the action column sizes to the widest

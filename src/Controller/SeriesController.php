@@ -41,6 +41,9 @@ final class SeriesController {
 		$episodes = $this->app->series->episodesForSeries($seriesId, $this->app->contentLang, $this->app->baseLang);
 		$watched  = array_fill_keys($this->app->watch->watchedEpisodeIds($userId, $seriesId), true);
 		$follow   = $this->app->series->followStatus($userId, $seriesId);
+		$ignored  = $follow !== null
+			? array_fill_keys($this->app->watch->ignoredSeasons($userId, $seriesId), true)
+			: [];
 
 		// Group episodes by season.
 		$seasons = [];
@@ -54,6 +57,7 @@ final class SeriesController {
 			'series'       => $series,
 			'seasons'      => $seasons,
 			'watched'      => $watched,
+			'ignored'      => $ignored,
 			'followStatus' => $follow['status'] ?? null,
 			'today'        => date('Y-m-d'),
 		]);
@@ -173,6 +177,27 @@ final class SeriesController {
 				'deferred'  => $this->app->t('Series deferred – it moves towards the end of the overview.'),
 			};
 			$this->app->session->flash('success', $message);
+		}
+
+		$this->app->redirect('/series/' . $seriesId);
+	}
+
+	/**
+	 * Ignores a season of a followed series (it no longer counts as open)
+	 * or counts it again.
+	 */
+	public function ignoreSeason(Request $request): void {
+		$this->app->requireUser();
+		$this->app->verifyCsrf($request);
+		$userId   = (int) $this->app->auth->userId();
+		$seriesId = $request->getInt('series_id');
+		$season   = $request->getInt('season_number');
+		$action   = $request->getString('action');   // ignore | count
+
+		// Only followed series: the ignore rows hang off user_series.
+		if ($seriesId > 0 && $season > 0 && in_array($action, ['ignore', 'count'], true)
+			&& $this->app->series->followStatus($userId, $seriesId) !== null) {
+			$this->app->watch->setSeasonIgnored($userId, $seriesId, $season, $action === 'ignore');
 		}
 
 		$this->app->redirect('/series/' . $seriesId);

@@ -58,6 +58,7 @@ $router->add('GET',  '/series/{id}', [$series, 'show']);
 $router->add('POST', '/follow',      [$series, 'setStatus']);
 $router->add('POST', '/remove',      [$series, 'remove']);
 $router->add('POST', '/watch',       [$watch, 'toggle']);
+$router->add('POST', '/season-ignore', [$series, 'ignoreSeason']);
 $router->add('GET',  '/import',        [$import, 'show']);
 $router->add('POST', '/import',        [$import, 'handle']);
 $router->add('GET',  '/import/status', [$import, 'status']);

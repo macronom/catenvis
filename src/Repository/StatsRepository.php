@@ -55,7 +55,9 @@ final class StatsRepository {
 		// Per-following-series badge signals (unseen aired count, upcoming
 		// count, the next upcoming episode number - E01 = a new season), then
 		// bucketed exactly like the dashboard badges. Like there, "upcoming"
-		// skips episodes already marked watched ahead of a wrong TMDB date.
+		// skips episodes already marked watched ahead of a wrong TMDB date,
+		// and ignored seasons count neither as open nor as upcoming.
+		$notIgnored = WatchRepository::notIgnoredSql();
 		$prod = $this->db->fetchOne(
 			"SELECT
 				SUM(pstatus = 'Returning Series' AND (unseen > 0 OR (upcoming > 0 AND COALESCE(next_ep, 0) <> 1))) AS airing,
@@ -67,11 +69,11 @@ final class StatsRepository {
 			 FROM (
 				SELECT s.status AS pstatus,
 					(SELECT COUNT(*) FROM episodes e
-						WHERE e.series_id = s.id AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
+						WHERE e.series_id = s.id AND e.air_date IS NOT NULL AND e.air_date <= CURDATE() {$notIgnored}
 						  AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)) AS unseen,
-					(SELECT COUNT(*) FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE()
+					(SELECT COUNT(*) FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE() {$notIgnored}
 						AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)) AS upcoming,
-					(SELECT e.episode_number FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE()
+					(SELECT e.episode_number FROM episodes e WHERE e.series_id = s.id AND e.air_date > CURDATE() {$notIgnored}
 						AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)
 						ORDER BY e.air_date, e.season_number, e.episode_number LIMIT 1) AS next_ep
 				FROM user_series us
@@ -114,7 +116,7 @@ final class StatsRepository {
 
 	/**
 	 * Unwatched but already-aired episodes of actively followed series
-	 * ("still to catch up").
+	 * ("still to catch up"), ignored seasons excluded.
 	 *
 	 * @return array{episodes: int, minutes: int}
 	 */
@@ -126,7 +128,8 @@ final class StatsRepository {
 				AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 			 ' . self::AVG_JOIN . '
 			 WHERE us.user_id = ? AND us.status IN (\'following\',\'deferred\')
-			   AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)',
+			   AND NOT EXISTS (SELECT 1 FROM user_watched w WHERE w.user_id = ? AND w.episode_id = e.id)'
+			   . WatchRepository::notIgnoredSql(),
 			[$userId, $userId]
 		);
 
@@ -134,8 +137,8 @@ final class StatsRepository {
 	}
 
 	/**
-	 * Number of followed series whose every already-aired episode is watched
-	 * (and that have at least one aired episode).
+	 * Number of followed series whose every already-aired episode outside
+	 * ignored seasons is watched (and that have at least one such episode).
 	 */
 	public function completedSeriesCount(int $userId): int {
 		return (int) $this->db->fetchValue(
@@ -146,7 +149,7 @@ final class StatsRepository {
 				JOIN episodes e ON e.series_id = s.id
 					AND e.air_date IS NOT NULL AND e.air_date <= CURDATE()
 				LEFT JOIN user_watched w ON w.episode_id = e.id AND w.user_id = ?
-				WHERE us.user_id = ?
+				WHERE us.user_id = ?' . WatchRepository::notIgnoredSql() . '
 				GROUP BY s.id
 				HAVING COUNT(*) = COUNT(w.episode_id)
 			 ) t',

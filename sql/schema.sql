@@ -134,6 +134,17 @@ CREATE TABLE IF NOT EXISTS user_watched (
 	CONSTRAINT fk_user_watched_episode FOREIGN KEY (episode_id) REFERENCES episodes (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Seasons a user ignores: they no longer count as open episodes
+-- (dashboard badges, backlog, progress). Cleaned up with the follow row.
+CREATE TABLE IF NOT EXISTS user_ignored_seasons (
+	user_id       INT UNSIGNED      NOT NULL,
+	series_id     INT UNSIGNED      NOT NULL,
+	season_number SMALLINT UNSIGNED NOT NULL,
+	PRIMARY KEY (user_id, series_id, season_number),
+	CONSTRAINT fk_user_ignored_seasons_follow FOREIGN KEY (user_id, series_id)
+		REFERENCES user_series (user_id, series_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Failed login attempts (brute-force protection). Rows are pruned once they
 -- age out of the lockout window; successful logins clear a username's rows.
 CREATE TABLE IF NOT EXISTS login_attempts (
@@ -160,3 +171,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 INSERT INTO schema_migrations (migration) VALUES ('001_add_episode_overview.sql');
 INSERT INTO schema_migrations (migration) VALUES ('002_mark_unavailable_series.sql');
 INSERT INTO schema_migrations (migration) VALUES ('003_add_episode_runtime.sql');
+INSERT INTO schema_migrations (migration) VALUES ('004_add_ignored_seasons.sql');

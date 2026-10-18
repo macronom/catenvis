@@ -19,9 +19,10 @@ operation").
 ## 2. Prepare the server (via `ssh <your-server>`)
 
 ```bash
-# Install Apache + PHP modules (PHP 8.3 required)
+# Install Apache + PHP modules (PHP 8.3 or newer required)
 sudo apt update
-sudo apt install apache2 libapache2-mod-php8.3 php8.3-mysql php8.3-curl
+sudo apt install apache2 libapache2-mod-php php-mysql php-curl
+php -v
 
 # Enable the rewrite module for the front controller
 sudo a2enmod rewrite

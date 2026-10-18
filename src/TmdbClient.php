@@ -143,7 +143,6 @@ final class TmdbClient {
 			$status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 			$errno  = curl_errno($ch);
 			$err    = curl_error($ch);
-			curl_close($ch);
 
 			if ($errno !== 0) {
 				$lastError = "curl error: $err";

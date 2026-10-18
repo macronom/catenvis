@@ -28,6 +28,7 @@ if (PHP_SAPI !== 'cli') {
 $projectDir = dirname(__DIR__);
 require $projectDir . '/vendor/autoload.php';
 
+$argv   = $_SERVER['argv'] ?? [];
 $status = false;
 foreach (array_slice($argv, 1) as $arg) {
 	if ($arg === '--status') {

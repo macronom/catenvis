@@ -183,6 +183,32 @@ final class SeriesController {
 	}
 
 	/**
+	 * Reloads a series completely from TMDB (all seasons, all active
+	 * languages), e.g. after TMDB renumbered or removed episodes.
+	 */
+	public function refresh(Request $request): void {
+		$this->app->requireUser();
+		$this->app->verifyCsrf($request);
+		$seriesId = $request->getInt('series_id');
+
+		if ($seriesId <= 0 || $this->app->series->find($seriesId) === null) {
+			$this->app->redirect('/');
+		}
+
+		// A full reload of a long-running series takes one request per season
+		// and language - far more than the default 30 seconds may allow.
+		set_time_limit(300);
+		try {
+			$this->app->seriesService()->sync($seriesId, true);
+			$this->app->session->flash('success', $this->app->t('Series reloaded from TMDB.'));
+		} catch (Throwable $e) {
+			$this->app->session->flash('error', $this->app->t('The series could not be reloaded: %s', $e->getMessage()));
+		}
+
+		$this->app->redirect('/series/' . $seriesId);
+	}
+
+	/**
 	 * Ignores a season of a followed series (it no longer counts as open)
 	 * or counts it again.
 	 */

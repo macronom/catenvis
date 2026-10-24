@@ -118,6 +118,11 @@ $statusAction = static function (string $status, string $label, string $class = 
 			<div class="actions">
 				<?= $watchAction('series', [], 'watch', $t('Mark all as watched'), 'btn-secondary') ?>
 				<?= $watchAction('series', [], 'unwatch', $t('Reset all'), 'btn-ghost', $t('Really remove all watched marks of this series?')) ?>
+				<form method="post" action="<?= $e($url('/series-refresh')) ?>" class="inline-form" data-busy="<?= $e($t('Reloading…')) ?>">
+					<input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+					<input type="hidden" name="series_id" value="<?= (int) $series['id'] ?>">
+					<button type="submit" class="btn-ghost" title="<?= $e($t('Reload all seasons and episodes of this series from TMDB')) ?>"><?= $e($t('Reload from TMDB')) ?></button>
+				</form>
 			</div>
 		</div>
 	</div>
@@ -222,6 +227,15 @@ $statusAction = static function (string $status, string $label, string $class = 
 			if (!window.confirm(form.dataset.confirm)) {
 				e.preventDefault();
 			}
+		});
+	});
+
+	// Long-running submits: show progress and block a second click.
+	document.querySelectorAll('form[data-busy]').forEach(function (form) {
+		form.addEventListener('submit', function () {
+			var btn = form.querySelector('button[type="submit"]');
+			btn.textContent = form.dataset.busy;
+			btn.disabled = true;
 		});
 	});
 

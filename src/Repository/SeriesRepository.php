@@ -14,6 +14,9 @@ use Catenvis\EpisodeTitle;
  * Database access to series, episodes and user_series.
  */
 final class SeriesRepository {
+	/** Added to episode numbers while a season is re-stored (fits SMALLINT UNSIGNED). */
+	private const PARKED_EPISODE_OFFSET = 32768;
+
 	private Database $db;
 
 	public function __construct(Database $db) {
@@ -152,6 +155,65 @@ final class SeriesRepository {
 			 SELECT e.id, ?, ?, ? FROM episodes e WHERE e.id = ?
 			 ON DUPLICATE KEY UPDATE name = VALUES(name), overview = VALUES(overview)',
 			[$lang, $name, $overview, $episodeId]
+		);
+	}
+
+	/**
+	 * Stores the episodes of one season as TMDB currently lists them, together
+	 * with their base language title rows, in one transaction.
+	 *
+	 * TMDB may renumber episodes (e.g. swap E03 and E05). Upserting them one by
+	 * one would then hit the unique (series, season, number) key, because the
+	 * target slot is still held by another episode. So the stored episodes of
+	 * the season are first parked on numbers above the real range and then
+	 * moved to their new slots. Rows not contained in the payload stay parked
+	 * until deleteStaleEpisodes() removes them (or a later season fetch moves
+	 * them to the season they belong to now).
+	 *
+	 * @param list<array{id: int, season_number: int, episode_number: int, air_date: ?string, runtime: ?int, name: string, overview: ?string}> $episodes
+	 */
+	public function replaceSeasonEpisodes(int $seriesId, int $seasonNumber, array $episodes, string $lang): void {
+		$this->db->transaction(function (Database $db) use ($seriesId, $seasonNumber, $episodes, $lang): void {
+			$db->execute(
+				'UPDATE episodes SET episode_number = episode_number + ?
+				 WHERE series_id = ? AND season_number = ? AND episode_number < ?',
+				[self::PARKED_EPISODE_OFFSET, $seriesId, $seasonNumber, self::PARKED_EPISODE_OFFSET]
+			);
+			foreach ($episodes as $episode) {
+				$this->upsertEpisode([
+					'id'             => $episode['id'],
+					'series_id'      => $seriesId,
+					'season_number'  => $episode['season_number'],
+					'episode_number' => $episode['episode_number'],
+					'air_date'       => $episode['air_date'],
+					'runtime'        => $episode['runtime'],
+				]);
+				$this->upsertEpisodeTranslation($episode['id'], $lang, $episode['name'], $episode['overview']);
+			}
+		});
+	}
+
+	/**
+	 * Deletes stored episodes of the given seasons that TMDB no longer lists
+	 * (removed, merged, or left parked by replaceSeasonEpisodes()). Their
+	 * translations and watched marks go with them (FK cascade).
+	 *
+	 * @param list<int> $seasonNumbers Seasons whose full episode list was just fetched.
+	 * @param list<int> $keepIds       Episode ids contained in those fetches.
+	 * @return int Number of deleted episodes.
+	 */
+	public function deleteStaleEpisodes(int $seriesId, array $seasonNumbers, array $keepIds): int {
+		if ($seasonNumbers === [] || $keepIds === []) {
+			return 0;
+		}
+
+		$seasonMarks = implode(',', array_fill(0, count($seasonNumbers), '?'));
+		$keepMarks   = implode(',', array_fill(0, count($keepIds), '?'));
+
+		return $this->db->execute(
+			"DELETE FROM episodes
+			 WHERE series_id = ? AND season_number IN ($seasonMarks) AND id NOT IN ($keepMarks)",
+			[$seriesId, ...$seasonNumbers, ...$keepIds]
 		);
 	}
 

@@ -111,6 +111,10 @@ final class SeriesService {
 		$extraLanguages  = array_values(array_diff($this->episodeLanguages, [$this->baseLang]));
 
 		$refreshed = 0;
+		// Seasons fetched with a non-empty episode list and the ids they
+		// contained: the basis for removing episodes TMDB no longer lists.
+		$fetchedSeasons = [];
+		$fetchedIds     = [];
 		foreach ($seasons as $season) {
 			$seasonNumber = (int) ($season['season_number'] ?? 0);
 			if ($seasonNumber < 1) {
@@ -136,6 +140,10 @@ final class SeriesService {
 			$hasNew = false;
 			if ($needsBase) {
 				$seasonIds = $this->syncSeason($seriesId, $seasonNumber);
+				if ($seasonIds !== []) {
+					$fetchedSeasons[] = $seasonNumber;
+					$fetchedIds       = [...$fetchedIds, ...$seasonIds];
+				}
 				$hasNew    = array_diff($seasonIds, $knownIds) !== [];
 				$knownIds  = array_values(array_unique([...$knownIds, ...$seasonIds]));
 				$refreshed++;
@@ -150,6 +158,10 @@ final class SeriesService {
 				$this->syncSeasonTranslations($seriesId, $seasonNumber, $lang, $knownIds);
 			}
 		}
+
+		// Only after all seasons: an episode moved to a later season is still
+		// in its old one while that is processed and must not be deleted there.
+		$this->series->deleteStaleEpisodes($seriesId, $fetchedSeasons, $fetchedIds);
 
 		// Anti-loop: seasons that exist only in the database (no longer listed
 		// by TMDB) can never be fetched again - mark their gaps as unavailable.
@@ -171,7 +183,7 @@ final class SeriesService {
 	/**
 	 * Fetches a single season (in the base request language) and stores its
 	 * episodes plus their base language title rows ('' = marker, same
-	 * convention as series).
+	 * convention as series). Renumbered episodes are moved to their new slots.
 	 *
 	 * @return list<int> Episode ids contained in the TMDB payload.
 	 */
@@ -179,30 +191,25 @@ final class SeriesService {
 		$season = $this->tmdb->season($seriesId, $seasonNumber);
 		$episodes = is_array($season['episodes'] ?? null) ? $season['episodes'] : [];
 
-		$ids = [];
+		$rows = [];
 		foreach ($episodes as $episode) {
 			$episodeId = (int) ($episode['id'] ?? 0);
 			if ($episodeId === 0) {
 				continue;
 			}
-			$this->series->upsertEpisode([
+			$rows[] = [
 				'id'             => $episodeId,
-				'series_id'      => $seriesId,
 				'season_number'  => (int) ($episode['season_number'] ?? $seasonNumber),
 				'episode_number' => (int) ($episode['episode_number'] ?? 0),
 				'air_date'       => $this->dateOrNull($episode['air_date'] ?? null),
 				'runtime'        => $this->intOrNull($episode['runtime'] ?? null),
-			]);
-			$this->series->upsertEpisodeTranslation(
-				$episodeId,
-				$this->baseLang,
-				(string) ($episode['name'] ?? ''),
-				$this->stringOrNull($episode['overview'] ?? null)
-			);
-			$ids[] = $episodeId;
+				'name'           => (string) ($episode['name'] ?? ''),
+				'overview'       => $this->stringOrNull($episode['overview'] ?? null),
+			];
 		}
+		$this->series->replaceSeasonEpisodes($seriesId, $seasonNumber, $rows, $this->baseLang);
 
-		return $ids;
+		return array_column($rows, 'id');
 	}
 
 	/**

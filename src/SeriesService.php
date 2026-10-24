@@ -111,8 +111,11 @@ final class SeriesService {
 		$extraLanguages  = array_values(array_diff($this->episodeLanguages, [$this->baseLang]));
 
 		$refreshed = 0;
-		// Seasons fetched with a non-empty episode list and the ids they
-		// contained: the basis for removing episodes TMDB no longer lists.
+		// Seasons whose episode list was fetched and the ids it contained: the
+		// basis for removing episodes TMDB no longer lists. An empty payload
+		// only counts when the series details also report 0 episodes for the
+		// season (e.g. an announced episode withdrawn) - otherwise it could be
+		// a glitch and must not wipe the stored episodes.
 		$fetchedSeasons = [];
 		$fetchedIds     = [];
 		foreach ($seasons as $season) {
@@ -140,7 +143,7 @@ final class SeriesService {
 			$hasNew = false;
 			if ($needsBase) {
 				$seasonIds = $this->syncSeason($seriesId, $seasonNumber);
-				if ($seasonIds !== []) {
+				if ($seasonIds !== [] || (isset($season['episode_count']) && $expected === 0)) {
 					$fetchedSeasons[] = $seasonNumber;
 					$fetchedIds       = [...$fetchedIds, ...$seasonIds];
 				}

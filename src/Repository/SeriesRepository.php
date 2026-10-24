@@ -199,22 +199,24 @@ final class SeriesRepository {
 	 * translations and watched marks go with them (FK cascade).
 	 *
 	 * @param list<int> $seasonNumbers Seasons whose full episode list was just fetched.
-	 * @param list<int> $keepIds       Episode ids contained in those fetches.
+	 * @param list<int> $keepIds       Episode ids contained in those fetches
+	 *                                 (empty = the seasons are empty at TMDB).
 	 * @return int Number of deleted episodes.
 	 */
 	public function deleteStaleEpisodes(int $seriesId, array $seasonNumbers, array $keepIds): int {
-		if ($seasonNumbers === [] || $keepIds === []) {
+		if ($seasonNumbers === []) {
 			return 0;
 		}
 
-		$seasonMarks = implode(',', array_fill(0, count($seasonNumbers), '?'));
-		$keepMarks   = implode(',', array_fill(0, count($keepIds), '?'));
+		$sql    = 'DELETE FROM episodes WHERE series_id = ? AND season_number IN ('
+			. implode(',', array_fill(0, count($seasonNumbers), '?')) . ')';
+		$params = [$seriesId, ...$seasonNumbers];
+		if ($keepIds !== []) {
+			$sql   .= ' AND id NOT IN (' . implode(',', array_fill(0, count($keepIds), '?')) . ')';
+			$params = [...$params, ...$keepIds];
+		}
 
-		return $this->db->execute(
-			"DELETE FROM episodes
-			 WHERE series_id = ? AND season_number IN ($seasonMarks) AND id NOT IN ($keepMarks)",
-			[$seriesId, ...$seasonNumbers, ...$keepIds]
-		);
+		return $this->db->execute($sql, $params);
 	}
 
 	/**

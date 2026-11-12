@@ -23,6 +23,13 @@ final class SeriesService {
 	/** ISO code of the TMDB base request language (top-level payload fields). */
 	private string $baseLang;
 
+	/** Largest storable episode id (episodes.id INT UNSIGNED). */
+	private const MAX_EPISODE_ID = 4294967295;
+	/** Largest storable season number (SMALLINT UNSIGNED). */
+	private const MAX_SEASON_NUMBER = 65535;
+	/** Network names are cut to this many characters (bounds the JSON column). */
+	private const NETWORK_NAME_LENGTH = 100;
+
 	/**
 	 * @param list<string> $languages        Active series content languages.
 	 * @param list<string> $episodeLanguages Active episode title languages.
@@ -77,11 +84,14 @@ final class SeriesService {
 			'last_air_date'      => $this->episodeDate($details['last_episode_to_air'] ?? null),
 			'next_air_date'      => $this->episodeDate($details['next_episode_to_air'] ?? null),
 		]);
+		$ownSync = $this->series->syncedAt($seriesId);
 
 		try {
 			return $this->syncContent($seriesId, $details, $forceSeasons);
 		} catch (\Throwable $e) {
-			$this->series->restoreSyncedAt($seriesId, $previousSync);
+			// Only while the stamp is still ours: an overlapping sync (e.g. the
+			// nightly job while a user adds the series) may have stamped it since.
+			$this->series->restoreSyncedAt($seriesId, $previousSync, $ownSync);
 			throw $e;
 		}
 	}
@@ -113,7 +123,7 @@ final class SeriesService {
 			$this->series->upsertTranslation($seriesId, $lang, $translation['name'], $translation['overview']);
 		}
 
-		$seasons = is_array($details['seasons'] ?? null) ? $details['seasons'] : [];
+		$seasons = $this->storableSeasons($seriesId, $details['seasons'] ?? null);
 		$maxSeason = 0;
 		foreach ($seasons as $season) {
 			$maxSeason = max($maxSeason, (int) ($season['season_number'] ?? 0));
@@ -224,20 +234,43 @@ final class SeriesService {
 
 		$rows = [];
 		foreach ($episodes as $episode) {
-			$episodeId = (int) ($episode['id'] ?? 0);
-			if ($episodeId === 0) {
+			if (!is_array($episode) || ($episode['id'] ?? null) === null) {
 				continue;
 			}
-			$rows[] = [
+			// One episode the columns cannot hold must not abort the whole
+			// series sync (every night again): skip it and name it in the log.
+			$episodeId     = self::uintOrNull($episode['id'], self::MAX_EPISODE_ID);
+			$episodeSeason = self::uintOrNull($episode['season_number'] ?? $seasonNumber, self::MAX_SEASON_NUMBER);
+			$episodeNumber = self::uintOrNull($episode['episode_number'] ?? 0, SeriesRepository::PARKED_EPISODE_MIN - 1);
+			if ($episodeId === null || $episodeId === 0 || $episodeSeason === null || $episodeNumber === null) {
+				self::log(sprintf(
+					'series %d season %d: skipped an episode that cannot be stored (id %s, season %s, number %s)',
+					$seriesId,
+					$seasonNumber,
+					self::describe($episode['id']),
+					self::describe($episode['season_number'] ?? null),
+					self::describe($episode['episode_number'] ?? null)
+				));
+				continue;
+			}
+			$rows[$episodeId] = [
 				'id'             => $episodeId,
-				'season_number'  => (int) ($episode['season_number'] ?? $seasonNumber),
-				'episode_number' => (int) ($episode['episode_number'] ?? 0),
+				'season_number'  => $episodeSeason,
+				'episode_number' => $episodeNumber,
 				'air_date'       => $this->dateOrNull($episode['air_date'] ?? null),
 				'runtime'        => $this->intOrNull($episode['runtime'] ?? null),
 				'name'           => TmdbValue::text($episode['name'] ?? null),
 				'overview'       => TmdbValue::longText($episode['overview'] ?? null),
 			];
 		}
+		// For an id already stored under another series, the upsert would keep
+		// that series_id but overwrite season, number, air date, runtime and
+		// title in the other series' row. Leave that row untouched.
+		foreach ($this->series->episodeIdsOfOtherSeries($seriesId, array_keys($rows)) as $foreignId) {
+			self::log(sprintf('series %d season %d: skipped episode %d, it belongs to another series', $seriesId, $seasonNumber, $foreignId));
+			unset($rows[$foreignId]);
+		}
+		$rows = array_values($rows);
 		// An empty payload leaves the stored episodes untouched: parking them
 		// would hide them as unplaceable rows if the payload was a glitch. A
 		// season that is really empty is cleared by deleteStaleEpisodes().
@@ -277,6 +310,62 @@ final class SeriesService {
 				$this->series->addEpisodeTranslationMarker($episodeId, $lang);
 			}
 		}
+	}
+
+	/**
+	 * The season entries of a details payload that can be processed: arrays
+	 * with a storable season number. Others are skipped and logged.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	private function storableSeasons(int $seriesId, mixed $seasons): array {
+		if (!is_array($seasons)) {
+			return [];
+		}
+
+		$result = [];
+		foreach ($seasons as $season) {
+			if (is_array($season) && self::uintOrNull($season['season_number'] ?? 0, self::MAX_SEASON_NUMBER) !== null) {
+				/** @var array<string, mixed> $season */
+				$result[] = $season;
+				continue;
+			}
+			self::log(sprintf(
+				'series %d: skipped a season entry that cannot be stored (season %s)',
+				$seriesId,
+				self::describe(is_array($season) ? ($season['season_number'] ?? null) : $season)
+			));
+		}
+
+		return $result;
+	}
+
+	/**
+	 * A non-negative integer up to $max (also from a digit string), else null.
+	 */
+	private static function uintOrNull(mixed $value, int $max): ?int {
+		if (is_string($value) && preg_match('/\A\d{1,10}\z/', $value) === 1) {
+			$value = (int) $value;
+		}
+
+		return is_int($value) && $value >= 0 && $value <= $max ? $value : null;
+	}
+
+	/**
+	 * Short, log-safe rendering of a payload value.
+	 */
+	private static function describe(mixed $value): string {
+		$text = is_scalar($value) ? var_export($value, true) : get_debug_type($value);
+
+		return mb_strimwidth((string) preg_replace('/[^\x20-\x7E]/', '?', $text), 0, 40, '...');
+	}
+
+	/**
+	 * Writes a note about skipped TMDB data to the error log (cron log or
+	 * web server log).
+	 */
+	private static function log(string $message): void {
+		error_log('Catenvis: ' . $message);
 	}
 
 	/**
@@ -343,18 +432,23 @@ final class SeriesService {
 
 		$list = [];
 		foreach ($networks as $network) {
-			$name = $this->optionalText($network['name'] ?? null, TmdbValue::NAME_LENGTH);
+			if (!is_array($network)) {
+				continue;
+			}
+			$name = $this->optionalText($network['name'] ?? null, self::NETWORK_NAME_LENGTH);
 			if ($name === null) {
 				continue;
 			}
 			$list[] = ['name' => $name, 'logo_path' => TmdbValue::imagePath($network['logo_path'] ?? null)];
-			// Bounds the TEXT column; real series list a handful at most.
+			// Bounds the TEXT column (65,535 bytes): 20 names of 100 characters
+			// stay far below it even when every character is escaped. Real
+			// series list a handful at most.
 			if (count($list) === 20) {
 				break;
 			}
 		}
 
-		return $list === [] ? null : (string) json_encode($list);
+		return $list === [] ? null : (string) json_encode($list, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 	}
 
 	/**

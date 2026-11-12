@@ -92,10 +92,23 @@ final class SeriesRepository {
 	}
 
 	/**
-	 * Puts back the sync stamp a failed sync replaced (null = never synced).
+	 * Puts back the sync stamp a failed sync replaced (null = never synced),
+	 * but only while the stored stamp is still the one that sync set.
+	 *
+	 * @param string|null $ownStamp Stamp the failed sync set.
 	 */
-	public function restoreSyncedAt(int $seriesId, ?string $syncedAt): void {
-		$this->db->execute('UPDATE series SET synced_at = ? WHERE id = ?', [$syncedAt, $seriesId]);
+	public function restoreSyncedAt(int $seriesId, ?string $syncedAt, ?string $ownStamp): void {
+		$this->db->execute(
+			'UPDATE series SET synced_at = ? WHERE id = ? AND synced_at <=> ?',
+			[$syncedAt, $seriesId, $ownStamp]
+		);
+	}
+
+	/**
+	 * Whether a series is flagged as unavailable at TMDB (see markSyncError).
+	 */
+	public function hasSyncError(int $seriesId): bool {
+		return $this->db->fetchValue('SELECT sync_error FROM series WHERE id = ?', [$seriesId]) !== null;
 	}
 
 	/**
@@ -142,6 +155,25 @@ final class SeriesRepository {
 			 ON DUPLICATE KEY UPDATE name = VALUES(name), overview = VALUES(overview)',
 			[$seriesId, $lang, $name, $overview]
 		);
+	}
+
+	/**
+	 * Of the given episode ids, those stored under another series.
+	 *
+	 * @param list<int> $episodeIds
+	 * @return list<int>
+	 */
+	public function episodeIdsOfOtherSeries(int $seriesId, array $episodeIds): array {
+		if ($episodeIds === []) {
+			return [];
+		}
+		$placeholders = implode(',', array_fill(0, count($episodeIds), '?'));
+		$rows = $this->db->fetchAll(
+			"SELECT id FROM episodes WHERE id IN ($placeholders) AND series_id <> ?",
+			[...$episodeIds, $seriesId]
+		);
+
+		return array_map(static fn(array $row): int => (int) $row['id'], $rows);
 	}
 
 	/**

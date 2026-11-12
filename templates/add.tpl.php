@@ -38,11 +38,12 @@
 		if ($altTitle === $mainTitle) {
 			$altTitle = '';
 		}
+		$posterPath = \Catenvis\TmdbValue::imagePath($item['poster_path'] ?? null);
 		?>
 		<div class="search-result">
 			<div class="poster small">
-				<?php if (!empty($item['poster_path']) && $imageBase !== ''): ?>
-					<img src="<?= $e($imageBase . $item['poster_path']) ?>" alt="" loading="lazy">
+				<?php if ($posterPath !== null && $imageBase !== ''): ?>
+					<img src="<?= $e($imageBase . $posterPath) ?>" alt="" loading="lazy">
 				<?php else: ?>
 					<div class="poster-placeholder">📺</div>
 				<?php endif; ?>

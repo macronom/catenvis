@@ -76,7 +76,9 @@ foreach ($seriesIds as $seriesId) {
 		printf("  Series %d: %d season(s) refreshed.\n", $seriesId, $refreshed);
 		$ok++;
 	} catch (\Catenvis\TmdbException $e) {
-		if ($e->isGone()) {
+		// Only a 404/410 on the series itself flags it; a vanished season
+		// is an ordinary error that the next run retries.
+		if ($e->isGone() && $repo->hasSyncError($seriesId)) {
 			// SeriesService already flagged it; it drops out of the nightly
 			// refresh and is surfaced to its followers on the dashboard.
 			fwrite(STDERR, sprintf("  Series %d unavailable (gone), marked and skipped from now on: %s\n", $seriesId, $e->getMessage()));

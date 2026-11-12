@@ -13,6 +13,12 @@ use Catenvis\Database;
  * Database access to the import queue (import_queue).
  */
 final class ImportQueueRepository {
+	/** Width of import_queue.message in characters. */
+	public const MESSAGE_LENGTH = 255;
+
+	/** Result message (translation key) for entries of an interrupted worker. */
+	public const INTERRUPTED = 'The import was interrupted.';
+
 	private Database $db;
 
 	public function __construct(Database $db) {
@@ -100,6 +106,28 @@ final class ImportQueueRepository {
 	 */
 	public function markProcessing(int $id): void {
 		$this->db->execute("UPDATE import_queue SET status = 'processing' WHERE id = ?", [$id]);
+	}
+
+	/**
+	 * Fails entries a previous worker left in processing (killed, crashed).
+	 * Only call while holding the worker lock.
+	 */
+	public function failStale(): void {
+		$this->db->execute(
+			"UPDATE import_queue SET status = 'failed', message = ?, processed_at = NOW() WHERE status = 'processing'",
+			[self::INTERRUPTED]
+		);
+	}
+
+	/**
+	 * Cuts a message to the column width; invalid UTF-8 becomes a generic text.
+	 */
+	public static function fitMessage(string $message): string {
+		if (preg_match('/\A.{0,' . self::MESSAGE_LENGTH . '}/us', $message, $match) !== 1) {
+			return 'Import failed.';
+		}
+
+		return $match[0];
 	}
 
 	/**

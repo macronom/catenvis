@@ -39,6 +39,12 @@ final class ImportController {
 		$counts  = $this->app->importQueue->statusCounts($userId);
 		$pending = ($counts['pending'] ?? 0) + ($counts['processing'] ?? 0);
 
+		// Open entries but possibly no worker (e.g. it was killed): start one.
+		// A worker that is already running holds the lock; the new one exits.
+		if ($pending > 0) {
+			$this->spawnWorker();
+		}
+
 		$this->app->view->render('import', [
 			'pageTitle' => $this->app->t('Import from IMDb'),
 			'counts'    => $counts,

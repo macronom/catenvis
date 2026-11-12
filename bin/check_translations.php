@@ -28,6 +28,7 @@ $dynamicKeys = [
 	'Running', 'In production', 'Planned', 'Pilot', 'Ended', 'Canceled',
 	// Import worker messages stored in import_queue.message ($t($r['message'])).
 	'No TMDB series found for this IMDb id.', 'Already present.',
+	'The import was interrupted.', 'Import failed.',
 ];
 
 $files = array_merge(

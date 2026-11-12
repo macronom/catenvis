@@ -60,6 +60,12 @@ $service = new SeriesService(
 $queue   = new ImportQueueRepository($db);
 $watch   = new WatchRepository($db);
 
+// We hold the lock, so no other worker is running: entries still marked as
+// processing were left behind by a worker that was killed or crashed. They
+// are failed rather than retried, so an entry that kills the worker every
+// time cannot block the queue for good.
+$queue->failStale();
+
 $processed = 0;
 while (($item = $queue->nextPending()) !== null) {
 	$id     = (int) $item['id'];
@@ -88,7 +94,12 @@ while (($item = $queue->nextPending()) !== null) {
 		$queue->setResult($id, 'done', (string) ($match['name'] ?? ''));
 		$processed++;
 	} catch (\Throwable $e) {
-		$queue->setResult($id, 'failed', $e->getMessage());
+		try {
+			$queue->setResult($id, 'failed', ImportQueueRepository::fitMessage($e->getMessage()));
+		} catch (\Throwable $inner) {
+			// The entry stays in processing; the next worker start fails it.
+			fwrite(STDERR, $inner->getMessage() . "\n");
+		}
 	}
 
 	// Ease the TMDB rate limit.

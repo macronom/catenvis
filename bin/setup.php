@@ -25,6 +25,7 @@ use Catenvis\Migrator;
 use Catenvis\Repository\UserRepository;
 use Catenvis\TmdbClient;
 use Catenvis\TmdbException;
+use Catenvis\Username;
 
 if (PHP_SAPI !== 'cli') {
 	fwrite(STDERR, "Can only be run from the command line.\n");
@@ -178,6 +179,10 @@ printf("Schema loaded (%d statements).\n", count($statements));
 $users = new UserRepository($db);
 echo "\nFirst admin account:\n";
 $adminUser = promptDefault('Admin username', 'admin');
+if (!Username::fits($adminUser)) {
+	fwrite(STDERR, sprintf("Username too long - re-run and choose at most %d characters. (Config and schema are already in place.)\n", Username::MAX_LENGTH));
+	exit(1);
+}
 $adminPass = promptHidden('Admin password (at least 8 characters): ');
 if (strlen($adminPass) < 8) {
 	fwrite(STDERR, "Password too short - re-run and choose at least 8 characters. (Config and schema are already in place.)\n");

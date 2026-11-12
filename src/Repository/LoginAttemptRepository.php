@@ -10,7 +10,7 @@ namespace Catenvis\Repository;
 use Catenvis\Database;
 
 /**
- * Records failed login attempts for brute-force protection. Attempts are
+ * Records login attempts for brute-force protection. Attempts are
  * keyed by IP address and by username so both a single-source flood and a
  * distributed attack on one account are throttled.
  */
@@ -22,33 +22,45 @@ final class LoginAttemptRepository {
 	}
 
 	/**
-	 * Number of failed attempts from an IP since the given datetime (Y-m-d H:i:s).
+	 * Number of recorded attempts from an IP within the last $windowSeconds.
 	 */
-	public function failuresByIp(string $ip, string $since): int {
+	public function failuresByIp(string $ip, int $windowSeconds): int {
 		return (int) $this->db->fetchValue(
-			'SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND attempted_at >= ?',
-			[$ip, $since]
+			'SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND attempted_at >= UTC_TIMESTAMP() - INTERVAL ? SECOND',
+			[$ip, $windowSeconds]
 		);
 	}
 
 	/**
-	 * Number of failed attempts for a username since the given datetime.
+	 * Number of recorded attempts for a username within the last $windowSeconds.
 	 */
-	public function failuresByUsername(string $username, string $since): int {
+	public function failuresByUsername(string $username, int $windowSeconds): int {
 		return (int) $this->db->fetchValue(
-			'SELECT COUNT(*) FROM login_attempts WHERE username = ? AND attempted_at >= ?',
-			[$username, $since]
+			'SELECT COUNT(*) FROM login_attempts WHERE username = ? AND attempted_at >= UTC_TIMESTAMP() - INTERVAL ? SECOND',
+			[$username, $windowSeconds]
 		);
 	}
 
 	/**
-	 * Records one failed login attempt.
+	 * Records one login attempt and returns its row id. The timestamp is set
+	 * explicitly in UTC on the database clock, the same clock the window
+	 * queries use, so neither PHP's time zone nor daylight-saving changes
+	 * affect the window.
 	 */
-	public function record(string $ip, string $username): void {
+	public function record(string $ip, string $username): int {
 		$this->db->execute(
-			'INSERT INTO login_attempts (ip, username) VALUES (?, ?)',
+			'INSERT INTO login_attempts (ip, username, attempted_at) VALUES (?, ?, UTC_TIMESTAMP())',
 			[$ip, $username]
 		);
+
+		return $this->db->lastInsertId();
+	}
+
+	/**
+	 * Removes a single recorded attempt (blocked or successful login).
+	 */
+	public function remove(int $id): void {
+		$this->db->execute('DELETE FROM login_attempts WHERE id = ?', [$id]);
 	}
 
 	/**
@@ -59,9 +71,12 @@ final class LoginAttemptRepository {
 	}
 
 	/**
-	 * Removes attempts older than the given datetime (housekeeping).
+	 * Removes attempts older than $windowSeconds (housekeeping).
 	 */
-	public function prune(string $before): void {
-		$this->db->execute('DELETE FROM login_attempts WHERE attempted_at < ?', [$before]);
+	public function prune(int $windowSeconds): void {
+		$this->db->execute(
+			'DELETE FROM login_attempts WHERE attempted_at < UTC_TIMESTAMP() - INTERVAL ? SECOND',
+			[$windowSeconds]
+		);
 	}
 }

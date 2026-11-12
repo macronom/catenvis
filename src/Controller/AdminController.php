@@ -9,6 +9,7 @@ namespace Catenvis\Controller;
 
 use Catenvis\App;
 use Catenvis\Request;
+use Catenvis\Username;
 
 /**
  * Admin-Bereich: Benutzerkonten anlegen und verwalten.
@@ -44,6 +45,10 @@ final class AdminController {
 
 		if ($username === '' || strlen($password) < 8) {
 			$this->app->session->flash('error', $this->app->t('Username required, password at least 8 characters.'));
+			$this->app->redirect('/admin/users');
+		}
+		if (!Username::fits($username)) {
+			$this->app->session->flash('error', $this->app->t('The username may be at most %d characters long.', Username::MAX_LENGTH));
 			$this->app->redirect('/admin/users');
 		}
 		if ($this->app->users->findByUsername($username) !== null) {

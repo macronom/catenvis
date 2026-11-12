@@ -9,6 +9,7 @@ namespace Catenvis\Controller;
 
 use Catenvis\App;
 use Catenvis\Request;
+use Catenvis\Username;
 
 /**
  * Login, Logout und erzwungener Passwortwechsel.
@@ -44,23 +45,35 @@ final class LoginController {
 		$password = $request->getString('password');
 		$ip       = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 
-		// Brute-force protection: block once too many recent failures are
-		// recorded for this IP or this username (rolling window, self-releasing).
+		// A name that cannot be stored must never reach the lookup: the
+		// collation ignores some characters, so it could still match a real
+		// account while recording the attempt fails on the column width.
+		if (!Username::fits($username)) {
+			$this->app->session->flash('error', $this->app->t('Username or password is incorrect.'));
+			$this->app->redirect('/login');
+		}
+
+		// Brute-force protection (rolling window, self-releasing). The attempt
+		// is recorded before the password check and counted including itself,
+		// so parallel requests cannot all pass the check before the first
+		// failure is stored. A blocked attempt removes its own row again so
+		// that hammering a locked account does not extend the lock-out.
 		$attempts = $this->app->loginAttempts;
-		$since    = date('Y-m-d H:i:s', time() - self::LOCKOUT_WINDOW);
-		$attempts->prune($since);
-		if ($attempts->failuresByIp($ip, $since) >= self::MAX_FAILURES
-			|| $attempts->failuresByUsername($username, $since) >= self::MAX_FAILURES) {
+		$attempts->prune(self::LOCKOUT_WINDOW);
+		$attemptId = $attempts->record($ip, $username);
+		if ($attempts->failuresByIp($ip, self::LOCKOUT_WINDOW) > self::MAX_FAILURES
+			|| $attempts->failuresByUsername($username, self::LOCKOUT_WINDOW) > self::MAX_FAILURES) {
+			$attempts->remove($attemptId);
 			$this->app->session->flash('error', $this->app->t('Too many failed attempts. Please try again later.'));
 			$this->app->redirect('/login');
 		}
 
 		if ($this->app->auth->attempt($username, $password, $this->app->browserLanguage())) {
+			$attempts->remove($attemptId);
 			$attempts->clearForUsername($username);
 			$this->app->redirect('/');
 		}
 
-		$attempts->record($ip, $username);
 		$this->app->session->flash('error', $this->app->t('Username or password is incorrect.'));
 		$this->app->redirect('/login');
 	}

@@ -152,6 +152,7 @@
 	"The current password is incorrect.": "La contraseña actual es incorrecta.",
 	"The password must be at least 8 characters long.": "La contraseña debe tener al menos 8 caracteres.",
 	"The passwords do not match.": "Las contraseñas no coinciden.",
+	"The username may be at most %d characters long.": "El nombre de usuario puede tener como máximo %d caracteres.",
 	"The series could not be loaded: %s": "No se pudo cargar la serie: %s",
 	"The series could not be reloaded: %s": "No se pudo recargar la serie: %s",
 	"The series data has not been updated in %d days - the automatic update may have stopped. Please notify the administrator.": "Los datos de las series no se han actualizado desde hace %d días: la actualización automática podría haberse detenido. Avisa al administrador.",

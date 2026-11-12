@@ -68,6 +68,7 @@ $router->add('POST', '/series-refresh', [$series, 'refresh']);
 $router->add('GET',  '/import',        [$import, 'show']);
 $router->add('POST', '/import',        [$import, 'handle']);
 $router->add('GET',  '/import/status', [$import, 'status']);
+$router->add('POST', '/import/cancel', [$import, 'cancel']);
 
 // Admin.
 $router->add('GET',  '/admin/users', [$admin, 'users']);

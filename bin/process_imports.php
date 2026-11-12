@@ -9,11 +9,11 @@ declare(strict_types=1);
 /**
  * Background worker for the IMDb import: drains the queue (import_queue).
  * Started automatically by the import page, but can also be run manually
- * or via cron - as the web server user, so it shares the lock file:
+ * or via cron, as a user that can read the configuration, e.g.:
  *   sudo -u www-data /usr/bin/php /var/www/catenvis/bin/process_imports.php
  *
- * A file lock in import.work_dir (default: the system temp directory)
- * ensures only one worker runs at a time.
+ * A lock in the database ensures that only one worker runs at a time, also
+ * when several hosts share the database.
  */
 
 use Catenvis\Config;
@@ -25,6 +25,7 @@ use Catenvis\Repository\WatchRepository;
 use Catenvis\SeriesService;
 use Catenvis\TmdbClient;
 use Catenvis\TmdbException;
+use Catenvis\TmdbValue;
 
 if (PHP_SAPI !== 'cli') {
 	fwrite(STDERR, "Can only be run from the command line.\n");
@@ -36,20 +37,16 @@ require $projectDir . '/vendor/autoload.php';
 
 $config = Config::load($projectDir . '/config/config.php');
 
+/** @var array<string, mixed> $dbConfig */
+$dbConfig = $config->get('db', []);
+$db    = new Database($dbConfig);
+$queue = new ImportQueueRepository($db);
+
 // Only one worker at a time.
-$lockPath = $config->importWorkDir() . '/catenvis_import.lock';
-$lock = @fopen($lockPath, 'c');
-if ($lock === false) {
-	fwrite(STDERR, "Cannot open the lock file $lockPath. Run the worker as the web server user (e.g. sudo -u www-data) or check import.work_dir.\n");
-	exit(1);
-}
-if (!flock($lock, LOCK_EX | LOCK_NB)) {
+if (!$queue->acquireWorkerLock()) {
 	// A worker is already running - it will pick up new entries too.
 	exit(0);
 }
-/** @var array<string, mixed> $dbConfig */
-$dbConfig = $config->get('db', []);
-$db = new Database($dbConfig);
 
 /** @var array<string, mixed> $tmdbConfig */
 $tmdbConfig = $config->get('tmdb', []);
@@ -62,7 +59,6 @@ $service = new SeriesService(
 	$users->activeContentLanguages($tmdb->baseLanguageCode()),
 	$users->activeEpisodeLanguages($tmdb->baseLanguageCode())
 );
-$queue   = new ImportQueueRepository($db);
 $watch   = new WatchRepository($db);
 
 // We hold the lock, so no other worker is running: entries still marked as
@@ -78,28 +74,27 @@ while (($item = $queue->nextPending($lastUserId)) !== null) {
 	$userId     = (int) $item['user_id'];
 	$lastUserId = $userId;
 	$imdbId = (string) $item['imdb_id'];
-	$queue->markProcessing($id);
+	if (!$queue->markProcessing($id)) {
+		// Taken or cancelled meanwhile.
+		continue;
+	}
 
 	try {
 		$match = $tmdb->findSeriesByImdbId($imdbId);
 		if ($match === null || (int) ($match['id'] ?? 0) === 0) {
 			$queue->setResult($id, 'notfound', 'No TMDB series found for this IMDb id.');
-			continue;
-		}
-		$seriesId = (int) $match['id'];
-
-		if ($series->followStatus($userId, $seriesId) !== null) {
+		} elseif ($series->followStatus($userId, (int) $match['id']) !== null) {
 			$queue->setResult($id, 'skipped', 'Already present.');
-			continue;
+		} else {
+			$seriesId = (int) $match['id'];
+			$service->sync($seriesId);
+			$series->setFollowStatus($userId, $seriesId, 'following');
+			if ((int) ($item['mark_seen'] ?? 0) === 1) {
+				$watch->markCompletedSeasons($userId, $seriesId);
+			}
+			$queue->setResult($id, 'done', TmdbValue::text($match['name'] ?? ''));
+			$processed++;
 		}
-
-		$service->sync($seriesId);
-		$series->setFollowStatus($userId, $seriesId, 'following');
-		if ((int) ($item['mark_seen'] ?? 0) === 1) {
-			$watch->markCompletedSeasons($userId, $seriesId);
-		}
-		$queue->setResult($id, 'done', (string) ($match['name'] ?? ''));
-		$processed++;
 	} catch (\Throwable $e) {
 		// Shown on the import page: TMDB messages carry only endpoint and
 		// status; anything else (database, internal) stays in the log.
@@ -117,12 +112,11 @@ while (($item = $queue->nextPending($lastUserId)) !== null) {
 		}
 	}
 
-	// Ease the TMDB rate limit.
+	// Ease the TMDB rate limit (every TMDB request, whatever its result).
 	usleep(200000);
 }
 
-flock($lock, LOCK_UN);
-fclose($lock);
+$queue->releaseWorkerLock();
 
 fwrite(STDOUT, sprintf("[%s] Import worker finished. Newly imported: %d.\n", date('Y-m-d H:i:s'), $processed));
 exit(0);

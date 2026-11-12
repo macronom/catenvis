@@ -301,6 +301,7 @@ input[type="text"], input[type="password"], input[type="search"] {
 .result-summary .muted { color: var(--muted); }
 .import-result details { margin: 0.5rem 0; }
 .import-result summary { cursor: pointer; color: var(--accent); }
+.import-cancel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.75rem 0; }
 .import-help { color: var(--muted); max-width: 640px; }
 .import-help ol { padding-left: 1.2rem; }
 .import-help code { background: var(--surface-2); padding: 0.1rem 0.35rem; border-radius: 4px; }

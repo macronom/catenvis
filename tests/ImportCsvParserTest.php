@@ -54,6 +54,69 @@ final class ImportCsvParserTest extends TestCase {
 		self::assertSame([], $notices);
 	}
 
+	public function testKeepsQuotedCommasQuotesAndLineBreaks(): void {
+		$csv = "Const,Title,Title Type\n"
+			. "tt0001,\"Show, with comma\",TV Series\n"
+			. "tt0002,\"Say \"\"hi\"\"\",TV Series\n"
+			. "tt0003,\"Two\nlines\",TV Series\n";
+
+		self::assertSame(
+			['tt0001' => 'Show, with comma', 'tt0002' => 'Say "hi"', 'tt0003' => "Two\nlines"],
+			$this->parse($csv)
+		);
+	}
+
+	public function testStrayQuoteInAnUnquotedFieldIsAnOrdinaryCharacter(): void {
+		$csv = "Const,Title,Title Type\n"
+			. "tt1,5\" Screen,TV Series\n"
+			. "tt2,Two,TV Series\n"
+			. "tt3,Three,TV Series\n"
+			. "tt4,Four,TV Series\n";
+
+		self::assertSame(
+			['tt1' => '5" Screen', 'tt2' => 'Two', 'tt3' => 'Three', 'tt4' => 'Four'],
+			$this->parse($csv)
+		);
+	}
+
+	public function testSkipsRowsWithTooManyFields(): void {
+		$csv = "Const,Title,Title Type\n"
+			. 'tt0001,Wide,TV Series' . str_repeat(',', 97) . "\n"
+			. 'tt0002,Too wide,TV Series' . str_repeat(',', 98) . "\n"
+			. "tt0003,Normal,TV Series\n";
+
+		self::assertSame(['tt0001' => 'Wide', 'tt0003' => 'Normal'], $this->parse($csv));
+	}
+
+	public function testSkipsAnOversizedHeader(): void {
+		$csv = 'Const,Title,Title Type' . str_repeat(',', 98) . "\n"
+			. "tt0001,Show,TV Series\n";
+
+		self::assertSame([], $this->parse($csv));
+	}
+
+	public function testOpenQuoteBeforeManyBlankLinesIsFast(): void {
+		$csv = "Const,Title,Title Type\n\"" . str_repeat("\n", 1024 * 1024);
+
+		$start  = hrtime(true);
+		$result = $this->parse($csv);
+
+		self::assertSame([], $result);
+		self::assertLessThan(1.0, (hrtime(true) - $start) / 1e9);
+	}
+
+	public function testLineOfCommasStaysWithinMemory(): void {
+		$csv = "Const,Title,Title Type\n" . str_repeat(',', 1024 * 1024) . "\n";
+
+		memory_reset_peak_usage();
+		$before = memory_get_usage();
+		$result = $this->parse($csv);
+		$used   = memory_get_peak_usage() - $before;
+
+		self::assertSame([], $result);
+		self::assertLessThan(16 * 1024 * 1024, $used);
+	}
+
 	/**
 	 * Runs the private parser on the given CSV content.
 	 *

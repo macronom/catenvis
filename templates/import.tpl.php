@@ -13,6 +13,10 @@ $processedCount = $total - (int) $pending;
 <section class="import-page">
 	<h1><?= $e($t('Import series from IMDb')) ?></h1>
 
+	<?php if (!$canSpawnWorker): ?>
+		<p class="flash flash-error"><?= $e($t('Imports cannot start automatically on this server (the PHP function exec is disabled). They only run when an administrator starts bin/process_imports.php.')) ?></p>
+	<?php endif; ?>
+
 	<?php if ($total > 0): ?>
 		<div class="import-result" id="import-status" data-status-url="<?= $e($url('/import/status')) ?>">
 			<?php if ($pending > 0): ?>
@@ -25,6 +29,11 @@ $processedCount = $total - (int) $pending;
 					'<span id="imp-processed">' . $processedCount . '</span>',
 					'<span id="imp-total">' . $total . '</span>',
 					'<strong id="imp-pending">' . (int) $pending . '</strong>') ?></p>
+				<form class="import-cancel" method="post" action="<?= $e($url('/import/cancel')) ?>">
+					<input type="hidden" name="_csrf" value="<?= $e($app->csrfToken()) ?>">
+					<button type="submit"><?= $e($t('Cancel import')) ?></button>
+					<span class="hint"><?= $e($t('Removes the entries that have not been processed yet.')) ?></span>
+				</form>
 			<?php else: ?>
 				<h2><?= $e($t('Import finished')) ?></h2>
 			<?php endif; ?>

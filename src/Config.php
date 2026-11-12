@@ -60,7 +60,7 @@ final class Config {
 	}
 
 	/**
-	 * Directory for the import worker's lock and log file: import.work_dir,
+	 * Directory for the import worker's log file: import.work_dir,
 	 * or the system temp directory when unset or empty.
 	 */
 	public function importWorkDir(): string {

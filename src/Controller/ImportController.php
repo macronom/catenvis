@@ -26,6 +26,15 @@ final class ImportController {
 	/** Maximum number of series accepted from one CSV file. */
 	private const MAX_IMPORT_ROWS = 5000;
 
+	/** Maximum size of an uploaded CSV file in bytes (IMDb exports are far smaller). */
+	private const MAX_FILE_BYTES = 1048576;
+
+	/** CSV rows with more fields are skipped (IMDb exports have about 15). */
+	private const MAX_FIELDS = 100;
+
+	/** Bytes fgetcsv reads at most per call; longer lines come in pieces. */
+	private const MAX_LINE_BYTES = 16384;
+
 	private App $app;
 
 	public function __construct(App $app) {
@@ -42,17 +51,18 @@ final class ImportController {
 		$counts  = $this->app->importQueue->statusCounts($userId);
 		$pending = ($counts['pending'] ?? 0) + ($counts['processing'] ?? 0);
 
-		// Open entries but possibly no worker (e.g. it was killed): start one.
-		// A worker that is already running holds the lock; the new one exits.
-		if ($pending > 0) {
+		// Open entries but no worker holding the lock (e.g. it was killed):
+		// start one.
+		if ($pending > 0 && $this->app->importQueue->isWorkerLockFree()) {
 			$this->spawnWorker();
 		}
 
 		$this->app->view->render('import', [
-			'pageTitle' => $this->app->t('Import from IMDb'),
-			'counts'    => $counts,
-			'pending'   => $pending,
-			'results'   => $this->app->importQueue->results($userId),
+			'pageTitle'      => $this->app->t('Import from IMDb'),
+			'counts'         => $counts,
+			'pending'        => $pending,
+			'results'        => $this->app->importQueue->results($userId),
+			'canSpawnWorker' => self::canSpawnWorker(),
 		]);
 	}
 
@@ -78,6 +88,19 @@ final class ImportController {
 	}
 
 	/**
+	 * Removes the user's entries that have not been started yet, e.g. when
+	 * no worker can run and the queue would otherwise block new imports.
+	 */
+	public function cancel(Request $request): void {
+		$this->app->requireUser();
+		$this->app->verifyCsrf($request);
+
+		$removed = $this->app->importQueue->cancelPending((int) $this->app->auth->userId());
+		$this->app->session->flash('success', $this->app->t('Import cancelled; %d open entries removed.', $removed));
+		$this->app->redirect('/import');
+	}
+
+	/**
 	 * Accepts the CSV upload, fills the queue and starts the worker.
 	 */
 	public function handle(Request $request): void {
@@ -93,6 +116,11 @@ final class ImportController {
 		$file = $_FILES['csv'] ?? null;
 		if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) $file['tmp_name'])) {
 			$this->app->session->flash('error', $this->app->t('Please select a CSV file.'));
+			$this->app->redirect('/import');
+		}
+		$size = filesize((string) $file['tmp_name']);
+		if ($size === false || $size > self::MAX_FILE_BYTES) {
+			$this->app->session->flash('error', $this->app->t('The file is too large (at most %d MB).', intdiv(self::MAX_FILE_BYTES, 1048576)));
 			$this->app->redirect('/import');
 		}
 
@@ -125,10 +153,17 @@ final class ImportController {
 	}
 
 	/**
+	 * Whether this PHP may start the background worker (exec not disabled).
+	 */
+	private static function canSpawnWorker(): bool {
+		return function_exists('exec');
+	}
+
+	/**
 	 * Starts the background worker as a detached process (if possible).
 	 */
 	private function spawnWorker(): void {
-		if (!function_exists('exec')) {
+		if (!self::canSpawnWorker()) {
 			return;
 		}
 		$php    = (string) $this->app->config->get('php_binary', '/usr/bin/php');
@@ -197,17 +232,21 @@ final class ImportController {
 	}
 
 	/**
-	 * Reads the next non-blank CSV row, or null at the end of the file.
-	 * Passes all arguments explicitly: the escape character is disabled
-	 * (RFC 4180 quoting only, as in IMDb exports); relying on its default
-	 * is deprecated as of PHP 8.4.
+	 * Reads the next non-blank CSV row with at most MAX_FIELDS fields, or null
+	 * at the end of the file.
+	 *
+	 * The length limit makes fgetcsv read an overlong line in pieces, so one
+	 * line of a million commas never becomes one huge array; such pieces have
+	 * too many fields and are skipped. All arguments are passed explicitly:
+	 * the escape character is disabled (RFC 4180 quoting only, as in IMDb
+	 * exports); relying on its default is deprecated as of PHP 8.4.
 	 *
 	 * @param resource $handle
 	 * @return list<string|null>|null
 	 */
 	private function readCsvRow($handle): ?array {
-		while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
-			if ($row !== [null]) {
+		while (($row = fgetcsv($handle, self::MAX_LINE_BYTES, ',', '"', '')) !== false) {
+			if ($row !== [null] && count($row) <= self::MAX_FIELDS) {
 				return $row;
 			}
 		}

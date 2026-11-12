@@ -19,6 +19,9 @@ final class ImportQueueRepository {
 	/** Result message (translation key) for entries of an interrupted worker. */
 	public const INTERRUPTED = 'The import was interrupted.';
 
+	/** SQL expression for the worker lock name (at most 64 characters). */
+	private const LOCK_NAME_SQL = "CONCAT('catenvis_import:', LEFT(DATABASE(), 48))";
+
 	private Database $db;
 
 	public function __construct(Database $db) {
@@ -119,10 +122,51 @@ final class ImportQueueRepository {
 	}
 
 	/**
-	 * Marks an entry as being processed.
+	 * Marks an entry as being processed, but only while it is still pending.
+	 *
+	 * @return bool False if the entry was taken (or cancelled) meanwhile.
 	 */
-	public function markProcessing(int $id): void {
-		$this->db->execute("UPDATE import_queue SET status = 'processing' WHERE id = ?", [$id]);
+	public function markProcessing(int $id): bool {
+		return $this->db->execute(
+			"UPDATE import_queue SET status = 'processing' WHERE id = ? AND status = 'pending'",
+			[$id]
+		) === 1;
+	}
+
+	/**
+	 * Takes the worker lock on this connection without waiting. It lives in
+	 * the database, because the queue does: workers on different hosts that
+	 * share the database exclude each other too. The name includes the
+	 * database, since GET_LOCK names are global to the database server.
+	 * The lock ends with the connection at the latest.
+	 *
+	 * @return bool True if this connection now holds the lock.
+	 */
+	public function acquireWorkerLock(): bool {
+		return (int) $this->db->fetchValue('SELECT GET_LOCK(' . self::LOCK_NAME_SQL . ', 0)') === 1;
+	}
+
+	/**
+	 * Releases the worker lock held by this connection.
+	 */
+	public function releaseWorkerLock(): void {
+		$this->db->fetchValue('SELECT RELEASE_LOCK(' . self::LOCK_NAME_SQL . ')');
+	}
+
+	/**
+	 * Checks whether no worker currently holds the lock.
+	 */
+	public function isWorkerLockFree(): bool {
+		return (int) $this->db->fetchValue('SELECT IS_FREE_LOCK(' . self::LOCK_NAME_SQL . ')') === 1;
+	}
+
+	/**
+	 * Removes a user's entries that have not been started yet.
+	 *
+	 * @return int Number of removed entries.
+	 */
+	public function cancelPending(int $userId): int {
+		return $this->db->execute("DELETE FROM import_queue WHERE user_id = ? AND status = 'pending'", [$userId]);
 	}
 
 	/**

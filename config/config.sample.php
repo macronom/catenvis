@@ -60,14 +60,13 @@ return [
 	],
 
 	'import' => [
-		// Directory for the IMDb import worker's lock and log file
-		// (catenvis_import.lock / catenvis_import.log). Empty = the system
-		// temp directory. Caveat: Apache under systemd usually gets a private
-		// /tmp (PrivateTmp), so a worker started by hand would use a different
-		// lock file than one started from the import page, and both could run
-		// at once. To run workers by hand, set a directory writable by the web
-		// server user (e.g. /var/lib/catenvis) and start them as that user
-		// (sudo -u www-data php bin/process_imports.php).
+		// Directory for the IMDb import worker's log file
+		// (catenvis_import.log), written when the import page starts the
+		// worker. Empty = the system temp directory; note that Apache under
+		// systemd usually gets a private /tmp (PrivateTmp), so the log is not
+		// in the /tmp you see. Set a directory writable by the web server user
+		// (e.g. /var/lib/catenvis) to find it there. Only one worker runs at a
+		// time; that is ensured by a lock in the database.
 		'work_dir' => '',
 	],
 

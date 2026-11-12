@@ -158,8 +158,8 @@ final class ImportController {
 			return [];
 		}
 
-		$header = fgetcsv($handle);
-		if ($header === false) {
+		$header = $this->readCsvRow($handle);
+		if ($header === null) {
 			fclose($handle);
 			return [];
 		}
@@ -175,7 +175,7 @@ final class ImportController {
 		}
 
 		$result = [];
-		while (($row = fgetcsv($handle)) !== false) {
+		while (($row = $this->readCsvRow($handle)) !== null) {
 			$type  = strtolower(preg_replace('/[^a-zA-Z]/', '', (string) ($row[$typeIdx] ?? '')));
 			$const = trim((string) ($row[$constIdx] ?? ''));
 			if (!in_array($type, self::SERIES_TYPES, true)) {
@@ -195,5 +195,24 @@ final class ImportController {
 		fclose($handle);
 
 		return $result;
+	}
+
+	/**
+	 * Reads the next non-blank CSV row, or null at the end of the file.
+	 * Passes all arguments explicitly: the escape character is disabled
+	 * (RFC 4180 quoting only, as in IMDb exports); relying on its default
+	 * is deprecated as of PHP 8.4.
+	 *
+	 * @param resource $handle
+	 * @return list<string|null>|null
+	 */
+	private function readCsvRow($handle): ?array {
+		while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
+			if ($row !== [null]) {
+				return $row;
+			}
+		}
+
+		return null;
 	}
 }

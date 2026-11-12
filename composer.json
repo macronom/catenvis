@@ -4,7 +4,11 @@
 	"type": "project",
 	"license": "GPL-3.0-or-later",
 	"require": {
-		"php": ">=8.3"
+		"php": ">=8.3",
+		"ext-ctype": "*",
+		"ext-curl": "*",
+		"ext-mbstring": "*",
+		"ext-pdo_mysql": "*"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.11",

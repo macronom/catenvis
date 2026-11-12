@@ -44,7 +44,7 @@ $missing = [];
 if (PHP_VERSION_ID < 80300) {
 	$missing[] = 'PHP 8.3+ (found ' . PHP_VERSION . ')';
 }
-foreach (['pdo_mysql', 'curl'] as $ext) {
+foreach (['pdo_mysql', 'curl', 'mbstring', 'ctype'] as $ext) {
 	if (!extension_loaded($ext)) {
 		$missing[] = "the $ext extension";
 	}

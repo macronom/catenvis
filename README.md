@@ -46,7 +46,7 @@ Series and episode data comes from [TMDB](https://www.themoviedb.org/).
 
 ## Requirements
 
-- PHP 8.3+ (extensions: `pdo_mysql`, `curl`)
+- PHP 8.3+ (extensions: `pdo_mysql`, `curl`, `mbstring`, `ctype`)
 - MySQL / MariaDB
 - Apache with `mod_rewrite`
 - A TMDB API key (v4 read access token or v3 API key)
@@ -80,5 +80,3 @@ it appears in the settings automatically. Check completeness with
 
 Catenvis is free software, licensed under the
 [GNU General Public License v3.0](LICENSE).
-</content>
-</invoke>

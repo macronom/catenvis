@@ -21,7 +21,7 @@ operation").
 ```bash
 # Install Apache + PHP modules (PHP 8.3 or newer required)
 sudo apt update
-sudo apt install apache2 libapache2-mod-php php-mysql php-curl
+sudo apt install apache2 libapache2-mod-php php-mysql php-curl php-mbstring
 php -v
 
 # Enable the rewrite module for the front controller

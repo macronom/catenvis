@@ -19,6 +19,7 @@ declare(strict_types=1);
 use Catenvis\Config;
 use Catenvis\Database;
 use Catenvis\Repository\UserRepository;
+use Catenvis\Username;
 
 if (PHP_SAPI !== 'cli') {
 	fwrite(STDERR, "Can only be run from the command line.\n");
@@ -45,6 +46,10 @@ $password = $positional[1] ?? prompt('Default password: ');
 
 if ($username === '' || strlen($password) < 8) {
 	fwrite(STDERR, "Username required and password at least 8 characters.\n");
+	exit(1);
+}
+if (!Username::fits($username)) {
+	fwrite(STDERR, sprintf("Username too long - at most %d characters.\n", Username::MAX_LENGTH));
 	exit(1);
 }
 if ($users->findByUsername($username) !== null) {

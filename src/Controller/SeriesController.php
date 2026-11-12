@@ -129,7 +129,9 @@ final class SeriesController {
 		}
 
 		try {
-			if ($this->app->series->find($seriesId) === null) {
+			// Unknown series, or an orphan nobody follows (no longer refreshed,
+			// possibly stale, not yet collected by the nightly cleanup): sync.
+			if ($this->app->series->find($seriesId) === null || !$this->app->series->hasFollowers($seriesId)) {
 				$this->app->seriesService()->sync($seriesId);
 			}
 			$this->app->series->setFollowStatus($userId, $seriesId, 'following');
@@ -142,8 +144,8 @@ final class SeriesController {
 	}
 
 	/**
-	 * Removes a series for the current user (and entirely from the DB if
-	 * nobody follows it any more).
+	 * Removes a series for the current user. Series nobody follows any more
+	 * are deleted by the nightly job (SeriesRepository::deleteOrphans).
 	 */
 	public function remove(Request $request): void {
 		$this->app->requireUser();

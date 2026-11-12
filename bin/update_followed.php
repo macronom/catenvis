@@ -93,5 +93,9 @@ foreach ($seriesIds as $seriesId) {
 	usleep(250000);
 }
 
-printf("[%s] Done. Successful: %d, errors: %d, newly unavailable: %d.\n", date('Y-m-d H:i:s'), $ok, $failed, $gone);
+// Series nobody follows any more (removed via the web UI, which never
+// deletes shared rows itself).
+$orphans = $repo->deleteOrphans();
+
+printf("[%s] Done. Successful: %d, errors: %d, newly unavailable: %d, orphans deleted: %d.\n", date('Y-m-d H:i:s'), $ok, $failed, $gone, $orphans);
 exit($failed > 0 ? 1 : 0);

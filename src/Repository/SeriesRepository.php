@@ -420,15 +420,19 @@ final class SeriesRepository {
 	}
 
 	/**
-	 * Removes a series for a user: deletes their watched markers and
-	 * the follow entry. If nobody follows it afterwards, the series is
-	 * completely deleted from the database (cascades episodes), so that no
-	 * unnecessary TMDB updates happen any more.
-	 *
-	 * @return bool True if the series was entirely removed from the DB.
+	 * Whether anybody follows the series (in any status).
 	 */
-	public function removeForUser(int $userId, int $seriesId): bool {
-		return (bool) $this->db->transaction(function (Database $db) use ($userId, $seriesId): bool {
+	public function hasFollowers(int $seriesId): bool {
+		return $this->db->fetchValue('SELECT 1 FROM user_series WHERE series_id = ? LIMIT 1', [$seriesId]) !== null;
+	}
+
+	/**
+	 * Removes a series for a user: deletes their watched markers and the
+	 * follow entry. The shared series row is never deleted here - another
+	 * user may be adding it right now; deleteOrphans() collects it later.
+	 */
+	public function removeForUser(int $userId, int $seriesId): void {
+		$this->db->transaction(function (Database $db) use ($userId, $seriesId): void {
 			$db->execute(
 				'DELETE w FROM user_watched w
 				 JOIN episodes e ON e.id = w.episode_id
@@ -439,17 +443,26 @@ final class SeriesRepository {
 				'DELETE FROM user_series WHERE user_id = ? AND series_id = ?',
 				[$userId, $seriesId]
 			);
-
-			$followers = (int) $db->fetchValue(
-				'SELECT COUNT(*) FROM user_series WHERE series_id = ?',
-				[$seriesId]
-			);
-			if ($followers === 0) {
-				$db->execute('DELETE FROM series WHERE id = ?', [$seriesId]);
-				return true;
-			}
-
-			return false;
 		});
+	}
+
+	/**
+	 * Deletes cached series that nobody follows or has watched marks for and
+	 * that have not been synced within the grace period (cascades episodes
+	 * and translations). The grace period protects a series another user is
+	 * adding right now: its row exists before the follow is stored, and the
+	 * sync stamps synced_at first.
+	 *
+	 * @return int Number of deleted series.
+	 */
+	public function deleteOrphans(int $graceHours = 24): int {
+		return $this->db->execute(
+			'DELETE FROM series
+			 WHERE NOT EXISTS (SELECT 1 FROM user_series us WHERE us.series_id = series.id)
+			   AND NOT EXISTS (SELECT 1 FROM episodes e JOIN user_watched w ON w.episode_id = e.id
+				WHERE e.series_id = series.id)
+			   AND (synced_at IS NULL OR synced_at < NOW() - INTERVAL ? HOUR)',
+			[$graceHours]
+		);
 	}
 }

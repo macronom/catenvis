@@ -40,7 +40,7 @@ php -m | grep -E 'pdo_mysql|curl|mbstring|ctype'
 ## 3. First deployment (from the development machine)
 
 ```bash
-# Sync files (incl. vendor/, excluding config.php and logs)
+# Sync files (incl. vendor/, excluding the local config and logs)
 deploy/deploy.sh
 ```
 
@@ -129,9 +129,15 @@ After changing project files, a local call is enough:
 deploy/deploy.sh
 ```
 
-- `config/config.php` and log files on the server are left untouched.
+- Everything in `config/` except `config.sample.php` stays out of the
+  deployment and of Git: `config.php` and copies such as `config.php.bak`
+  are neither uploaded nor deleted on the server. Log files are left
+  untouched as well.
 - Local-only files (files excluded from Git locally via `.git/info/exclude`,
   `deploy/deploy.env`, `tests/`, test and analysis configs) are not deployed.
+  `deploy.sh` reads `.git/info/exclude` with rsync and stops first on lines
+  that rsync would read differently from Git, such as `!` negations or
+  trailing spaces.
   rsync does not delete excluded files on the server, so copies from older
   deployments must be removed there by hand.
 - `vendor/` is deployed as is, including the dev packages (PHPUnit, PHPStan):

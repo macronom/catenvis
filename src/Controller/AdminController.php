@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace Catenvis\Controller;
 
 use Catenvis\App;
+use Catenvis\Auth;
 use Catenvis\Request;
 use Catenvis\Username;
 
@@ -51,12 +52,16 @@ final class AdminController {
 			$this->app->session->flash('error', $this->app->t('The username may be at most %d characters long.', Username::MAX_LENGTH));
 			$this->app->redirect('/admin/users');
 		}
+		if (!Auth::isHashable($password)) {
+			$this->app->session->flash('error', $this->app->t('The password contains an invalid character.'));
+			$this->app->redirect('/admin/users');
+		}
 		if ($this->app->users->findByUsername($username) !== null) {
 			$this->app->session->flash('error', $this->app->t('Username is already taken.'));
 			$this->app->redirect('/admin/users');
 		}
 
-		$this->app->users->create($username, password_hash($password, PASSWORD_DEFAULT), $isAdmin);
+		$this->app->users->create($username, Auth::hashPassword($password), $isAdmin);
 		$this->app->session->flash('success', $this->app->t('User "%s" created. The password must be changed on first login.', $username));
 		$this->app->redirect('/admin/users');
 	}

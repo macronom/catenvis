@@ -16,13 +16,16 @@ final class Auth {
 	private const SESSION_KEY = 'user_id';
 	private const SESSION_PW_TOKEN = 'pw_token';
 	/**
-	 * bcrypt hashes of random, discarded passwords. An unknown username is
-	 * verified against one of them, so the response takes as long as for a
-	 * real account and does not reveal which names exist. Cost 10 matches
-	 * PASSWORD_DEFAULT up to PHP 8.3, cost 12 from PHP 8.4 on.
+	 * bcrypt options for every stored password hash and for the dummy hash.
+	 * Fixed instead of PASSWORD_DEFAULT, whose cost depends on the PHP version.
 	 */
-	private const DUMMY_HASH_COST_10 = '$2y$10$HK9Rv33v4BRVYhV7MWiDXO4wlv2D5RDDmrhBZEkx2dQL/1.0tLbHW';
-	private const DUMMY_HASH_COST_12 = '$2y$12$g/WDLPF9EmBGRZlDmXi.ie43qx0flN21eu9MDBQVrmy/9aAiNVZlG';
+	private const HASH_OPTIONS = ['cost' => 12];
+	/**
+	 * bcrypt hash (same cost as HASH_OPTIONS) of a random, discarded password.
+	 * An unknown username is verified against it, so the response takes as
+	 * long as for a real account and does not reveal which names exist.
+	 */
+	private const DUMMY_HASH = '$2y$12$g/WDLPF9EmBGRZlDmXi.ie43qx0flN21eu9MDBQVrmy/9aAiNVZlG';
 
 	private UserRepository $users;
 	private Session $session;
@@ -44,20 +47,48 @@ final class Auth {
 	}
 
 	/**
+	 * Hashes a password with the application-wide algorithm and cost.
+	 */
+	public static function hashPassword(#[\SensitiveParameter] string $password): string {
+		return password_hash($password, PASSWORD_BCRYPT, self::HASH_OPTIONS);
+	}
+
+	/**
+	 * Tells whether a password can be hashed at all: bcrypt rejects null bytes.
+	 */
+	public static function isHashable(#[\SensitiveParameter] string $password): bool {
+		return !str_contains($password, "\0");
+	}
+
+	/**
 	 * Verifies the credentials and logs the user in on success.
 	 *
 	 * @param string|null $initialLang Language preference to store on the very
 	 *                                 first login (e.g. negotiated from the
 	 *                                 browser); ignored on later logins.
 	 */
-	public function attempt(string $username, string $password, ?string $initialLang = null): bool {
+	public function attempt(string $username, #[\SensitiveParameter] string $password, ?string $initialLang = null): bool {
 		$user = $this->users->findByUsername($username);
-		if ($user === null) {
-			password_verify($password, PHP_VERSION_ID >= 80400 ? self::DUMMY_HASH_COST_12 : self::DUMMY_HASH_COST_10);
+		// password_verify ignores everything from a null byte on, so such a
+		// password could match a stored one but never be rehashed.
+		if ($user === null || !self::isHashable($password)) {
+			password_verify($password, self::DUMMY_HASH);
 			return false;
 		}
 		if (!password_verify($password, (string) $user['password_hash'])) {
 			return false;
+		}
+
+		// Bring a hash of another cost (e.g. created under an older PHP) to the
+		// common cost, so failed logins take the same time for every account
+		// and for unknown names. Its other sessions end once, as the session
+		// token derives from the hash. Only replaced while the stored hash is
+		// still the verified one, so parallel logins cannot overwrite a change.
+		if (password_needs_rehash((string) $user['password_hash'], PASSWORD_BCRYPT, self::HASH_OPTIONS)) {
+			$newHash = self::hashPassword($password);
+			if ($this->users->replacePasswordHash((int) $user['id'], (string) $user['password_hash'], $newHash)) {
+				$user['password_hash'] = $newHash;
+			}
 		}
 
 		// First login ever: adopt the browser language as the starting
@@ -82,11 +113,11 @@ final class Auth {
 	}
 
 	/**
-	 * Logs the current user out.
+	 * Logs the current user out and discards all session data, so nothing
+	 * (e.g. pending flash messages) is left for the next user of the browser.
 	 */
 	public function logout(): void {
-		$this->session->remove(self::SESSION_KEY);
-		$this->session->remove(self::SESSION_PW_TOKEN);
+		$this->session->clear();
 		$this->session->regenerate();
 		$this->currentUser = null;
 		$this->loaded      = true;
@@ -136,6 +167,7 @@ final class Auth {
 			} else {
 				$this->session->remove(self::SESSION_KEY);
 				$this->session->remove(self::SESSION_PW_TOKEN);
+				$this->session->regenerate();
 			}
 		}
 
@@ -155,22 +187,24 @@ final class Auth {
 	/**
 	 * Checks whether the given password matches that of the current user.
 	 */
-	public function verifyPassword(string $password): bool {
+	public function verifyPassword(#[\SensitiveParameter] string $password): bool {
 		$user = $this->user();
 
-		return $user !== null && password_verify($password, (string) $user['password_hash']);
+		return $user !== null
+			&& self::isHashable($password)
+			&& password_verify($password, (string) $user['password_hash']);
 	}
 
 	/**
 	 * Changes the current user's password, clears the forced-change flag and
 	 * logs them out of all sessions (including the current one).
 	 */
-	public function changePassword(string $newPassword): void {
+	public function changePassword(#[\SensitiveParameter] string $newPassword): void {
 		$id = $this->userId();
 		if ($id === null) {
 			return;
 		}
-		$this->users->updatePassword($id, password_hash($newPassword, PASSWORD_DEFAULT));
+		$this->users->updatePassword($id, self::hashPassword($newPassword));
 		// Other sessions become invalid via the password token,
 		// the current one is logged out directly.
 		$this->logout();

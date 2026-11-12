@@ -19,6 +19,7 @@ declare(strict_types=1);
  *   php bin/setup.php --force    # overwrite an existing config / non-empty DB
  */
 
+use Catenvis\Auth;
 use Catenvis\ConfigWriter;
 use Catenvis\Database;
 use Catenvis\Migrator;
@@ -193,11 +194,15 @@ if (strlen($adminPass) < 8) {
 	fwrite(STDERR, "Password too short - re-run and choose at least 8 characters. (Config and schema are already in place.)\n");
 	exit(1);
 }
+if (!Auth::isHashable($adminPass)) {
+	fwrite(STDERR, "The password must not contain a null byte - re-run and choose another. (Config and schema are already in place.)\n");
+	exit(1);
+}
 if ($users->findByUsername($adminUser) !== null) {
 	fwrite(STDERR, "Username \"$adminUser\" already exists.\n");
 	exit(1);
 }
-$users->create($adminUser, password_hash($adminPass, PASSWORD_DEFAULT), true);
+$users->create($adminUser, Auth::hashPassword($adminPass), true);
 echo "Admin \"$adminUser\" created (password change required on first login).\n";
 
 // 10. Next steps.

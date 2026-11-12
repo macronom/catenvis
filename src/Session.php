@@ -112,8 +112,17 @@ final class Session {
 	 * not valid afterwards. App::csrfToken creates a fresh one on next use.
 	 */
 	private function renewId(): void {
-		session_regenerate_id(true);
+		if (!session_regenerate_id(true)) {
+			throw new \RuntimeException('Could not renew the session id.');
+		}
 		unset($_SESSION[self::CSRF_KEY]);
+	}
+
+	/**
+	 * Removes all session data but keeps the session itself.
+	 */
+	public function clear(): void {
+		$_SESSION = [];
 	}
 
 	/**

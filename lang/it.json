@@ -151,6 +151,7 @@
 	"Stopped series": "Serie interrotte",
 	"The TMDB search failed: %s": "La ricerca su TMDB non è riuscita: %s",
 	"The current password is incorrect.": "La password attuale non è corretta.",
+	"The password contains an invalid character.": "La password contiene un carattere non valido.",
 	"The password must be at least 8 characters long.": "La password deve contenere almeno 8 caratteri.",
 	"The passwords do not match.": "Le password non coincidono.",
 	"The username may be at most %d characters long.": "Il nome utente può avere al massimo %d caratteri.",

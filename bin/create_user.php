@@ -16,6 +16,7 @@ declare(strict_types=1);
  * The user must change the password on first login.
  */
 
+use Catenvis\Auth;
 use Catenvis\Config;
 use Catenvis\Database;
 use Catenvis\Repository\UserRepository;
@@ -52,12 +53,16 @@ if (!Username::fits($username)) {
 	fwrite(STDERR, sprintf("Username too long - at most %d characters.\n", Username::MAX_LENGTH));
 	exit(1);
 }
+if (!Auth::isHashable($password)) {
+	fwrite(STDERR, "The password must not contain a null byte.\n");
+	exit(1);
+}
 if ($users->findByUsername($username) !== null) {
 	fwrite(STDERR, "Username is already taken.\n");
 	exit(1);
 }
 
-$id = $users->create($username, password_hash($password, PASSWORD_DEFAULT), $isAdmin);
+$id = $users->create($username, Auth::hashPassword($password), $isAdmin);
 printf("User \"%s\" (id %d, %s) created. Password change required on first login.\n",
 	$username, $id, $isAdmin ? 'Admin' : 'User');
 

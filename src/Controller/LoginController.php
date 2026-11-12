@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace Catenvis\Controller;
 
 use Catenvis\App;
+use Catenvis\Auth;
 use Catenvis\Request;
 use Catenvis\Username;
 
@@ -43,7 +44,6 @@ final class LoginController {
 		$this->app->verifyCsrf($request);
 		$username = $request->getString('username');
 		$password = $request->getString('password');
-		$ip       = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 
 		// A name that cannot be stored must never reach the lookup: the
 		// collation ignores some characters, so it could still match a real
@@ -53,22 +53,9 @@ final class LoginController {
 			$this->app->redirect('/login');
 		}
 
-		// Brute-force protection (rolling window, self-releasing). The attempt
-		// is recorded before the password check and counted including itself,
-		// so parallel requests cannot all pass the check before the first
-		// failure is stored. A blocked attempt removes its own row again so
-		// that hammering a locked account does not extend the lock-out.
-		$attempts = $this->app->loginAttempts;
-		$attempts->prune(self::LOCKOUT_WINDOW);
-		$attemptId = $attempts->record($ip, $username);
-		if ($attempts->failuresByIp($ip, self::LOCKOUT_WINDOW) > self::MAX_FAILURES
-			|| $attempts->failuresByUsername($username, self::LOCKOUT_WINDOW) > self::MAX_FAILURES) {
-			$attempts->remove($attemptId);
-			$this->app->session->flash('error', $this->app->t('Too many failed attempts. Please try again later.'));
-			$this->app->redirect('/login');
-		}
-
+		$attemptId = $this->recordAttempt($username, '/login');
 		if ($this->app->auth->attempt($username, $password, $this->app->browserLanguage())) {
+			$attempts = $this->app->loginAttempts;
 			$attempts->remove($attemptId);
 			$attempts->clearForUsername($username);
 			$this->app->redirect('/');
@@ -82,6 +69,12 @@ final class LoginController {
 	 * Meldet den User ab.
 	 */
 	public function logout(Request $request): void {
+		// A session that is no longer logged in (e.g. invalidated by a password
+		// change elsewhere, which also renewed its id and CSRF token) has
+		// nothing to log out; it needs no token protection.
+		if (!$this->app->auth->isLoggedIn()) {
+			$this->app->redirect('/login');
+		}
 		$this->app->verifyCsrf($request);
 		$this->app->auth->logout();
 		$this->app->redirect('/login');
@@ -106,12 +99,22 @@ final class LoginController {
 		$new     = $request->getString('password');
 		$confirm = $request->getString('password_confirm');
 
+		// The current password is guessable here too (e.g. at an unattended
+		// browser), so failures count towards the login limits of this account.
+		$username  = (string) ($this->app->auth->user()['username'] ?? '');
+		$attemptId = $this->recordAttempt($username, '/change-password');
 		if (!$this->app->auth->verifyPassword($current)) {
 			$this->app->session->flash('error', $this->app->t('The current password is incorrect.'));
 			$this->app->redirect('/change-password');
 		}
+		$this->app->loginAttempts->remove($attemptId);
+
 		if (strlen($new) < 8) {
 			$this->app->session->flash('error', $this->app->t('The password must be at least 8 characters long.'));
+			$this->app->redirect('/change-password');
+		}
+		if (!Auth::isHashable($new)) {
+			$this->app->session->flash('error', $this->app->t('The password contains an invalid character.'));
 			$this->app->redirect('/change-password');
 		}
 		if ($new !== $confirm) {
@@ -126,5 +129,33 @@ final class LoginController {
 		$this->app->auth->changePassword($new);
 		$this->app->session->flash('success', $this->app->t('Password changed. Please log in with your new password.'));
 		$this->app->redirect('/login');
+	}
+
+	/**
+	 * Records a password check for the brute-force protection and stops with
+	 * an error when the limits are exceeded (rolling window, self-releasing).
+	 *
+	 * The attempt is recorded before the check and counted including itself,
+	 * so parallel requests cannot all pass before the first failure is
+	 * stored. A blocked attempt removes its own row again so that hammering a
+	 * locked account does not extend the lock-out. The caller removes the row
+	 * once the password turned out to be correct.
+	 *
+	 * @param string $redirect Path to return to when blocked.
+	 * @return int Id of the recorded attempt.
+	 */
+	private function recordAttempt(string $username, string $redirect): int {
+		$ip       = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+		$attempts = $this->app->loginAttempts;
+		$attempts->prune(self::LOCKOUT_WINDOW);
+		$attemptId = $attempts->record($ip, $username);
+		if ($attempts->failuresByIp($ip, self::LOCKOUT_WINDOW) > self::MAX_FAILURES
+			|| $attempts->failuresByUsername($username, self::LOCKOUT_WINDOW) > self::MAX_FAILURES) {
+			$attempts->remove($attemptId);
+			$this->app->session->flash('error', $this->app->t('Too many failed attempts. Please try again later.'));
+			$this->app->redirect($redirect);
+		}
+
+		return $attemptId;
 	}
 }

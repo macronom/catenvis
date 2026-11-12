@@ -100,6 +100,19 @@ final class UserRepository {
 	}
 
 	/**
+	 * Replaces a password hash by a re-computed one of the same password,
+	 * leaving must_change_password untouched. Only succeeds while the stored
+	 * hash is still $oldHash, so two parallel logins cannot overwrite a
+	 * password change made in between.
+	 */
+	public function replacePasswordHash(int $userId, string $oldHash, string $newHash): bool {
+		return $this->db->execute(
+			'UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?',
+			[$newHash, $userId, $oldHash]
+		) === 1;
+	}
+
+	/**
 	 * Saves a display setting of the user (column checked via whitelist).
 	 */
 	public function updatePreference(int $userId, string $column, string $value): void {

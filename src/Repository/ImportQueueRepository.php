@@ -91,14 +91,16 @@ final class ImportQueueRepository {
 	}
 
 	/**
-	 * Fetches the next open entry (across all users) or null.
+	 * Fetches the next open entry or null, alternating between users (round
+	 * robin), so one large import cannot hold back everybody else's.
 	 *
+	 * @param int $afterUserId User served last (0 = start with the lowest user id).
 	 * @return array<string, mixed>|null
 	 */
-	public function nextPending(): ?array {
-		return $this->db->fetchOne(
-			"SELECT * FROM import_queue WHERE status = 'pending' ORDER BY id LIMIT 1"
-		);
+	public function nextPending(int $afterUserId = 0): ?array {
+		$sql = "SELECT * FROM import_queue WHERE status = 'pending' AND user_id > ? ORDER BY user_id, id LIMIT 1";
+
+		return $this->db->fetchOne($sql, [$afterUserId]) ?? $this->db->fetchOne($sql, [0]);
 	}
 
 	/**

@@ -23,6 +23,9 @@ final class ImportController {
 	 */
 	private const SERIES_TYPES = ['tvseries', 'tvminiseries'];
 
+	/** Maximum number of series accepted from one CSV file. */
+	private const MAX_IMPORT_ROWS = 5000;
+
 	private App $app;
 
 	public function __construct(App $app) {
@@ -98,6 +101,10 @@ final class ImportController {
 			$this->app->session->flash('error', $this->app->t('No series (tvSeries/tvMiniSeries) found in the file.'));
 			$this->app->redirect('/import');
 		}
+		$truncated = count($consts) > self::MAX_IMPORT_ROWS;
+		if ($truncated) {
+			$consts = array_slice($consts, 0, self::MAX_IMPORT_ROWS, true);
+		}
 
 		// Discard the old history, enqueue the new batch, kick off the worker.
 		$markSeen = $request->getBool('mark_seen');
@@ -109,6 +116,12 @@ final class ImportController {
 			'%d series queued. The import runs in the background.',
 			count($consts)
 		));
+		if ($truncated) {
+			$this->app->session->flash('error', $this->app->t(
+				'The file contains more series than allowed; only the first %d were queued.',
+				self::MAX_IMPORT_ROWS
+			));
+		}
 		$this->app->redirect('/import');
 	}
 
@@ -134,6 +147,8 @@ final class ImportController {
 
 	/**
 	 * Reads the IMDb CSV and returns a map imdbId => title for series rows.
+	 * Stops after one entry more than MAX_IMPORT_ROWS, so the caller can tell
+	 * that the file was longer than allowed.
 	 *
 	 * @return array<string, string>
 	 */
@@ -166,11 +181,16 @@ final class ImportController {
 			if (!in_array($type, self::SERIES_TYPES, true)) {
 				continue;
 			}
-			if (preg_match('/^tt\d+$/', $const) !== 1) {
+			// Fits import_queue.imdb_id (VARCHAR(20)).
+			if (preg_match('/\Att\d{1,12}\z/', $const) !== 1) {
 				continue;
 			}
 			$title = $titleIdx !== false ? trim((string) ($row[$titleIdx] ?? '')) : '';
-			$result[$const] = $title;
+			// Fits import_queue.title (VARCHAR(255)); invalid UTF-8 yields ''.
+			$result[$const] = preg_match('/\A.{0,255}/us', $title, $match) === 1 ? $match[0] : '';
+			if (count($result) > self::MAX_IMPORT_ROWS) {
+				break;
+			}
 		}
 		fclose($handle);
 

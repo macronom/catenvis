@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS import_queue (
 	PRIMARY KEY (id),
 	KEY idx_import_status (status),
 	KEY idx_import_user (user_id),
+	KEY idx_import_pending (status, user_id, id),
 	CONSTRAINT fk_import_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -172,3 +173,4 @@ INSERT INTO schema_migrations (migration) VALUES ('001_add_episode_overview.sql'
 INSERT INTO schema_migrations (migration) VALUES ('002_mark_unavailable_series.sql');
 INSERT INTO schema_migrations (migration) VALUES ('003_add_episode_runtime.sql');
 INSERT INTO schema_migrations (migration) VALUES ('004_add_ignored_seasons.sql');
+INSERT INTO schema_migrations (migration) VALUES ('005_add_import_pending_index.sql');

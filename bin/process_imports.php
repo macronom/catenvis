@@ -66,10 +66,12 @@ $watch   = new WatchRepository($db);
 // time cannot block the queue for good.
 $queue->failStale();
 
-$processed = 0;
-while (($item = $queue->nextPending()) !== null) {
-	$id     = (int) $item['id'];
-	$userId = (int) $item['user_id'];
+$processed  = 0;
+$lastUserId = 0;
+while (($item = $queue->nextPending($lastUserId)) !== null) {
+	$id         = (int) $item['id'];
+	$userId     = (int) $item['user_id'];
+	$lastUserId = $userId;
 	$imdbId = (string) $item['imdb_id'];
 	$queue->markProcessing($id);
 

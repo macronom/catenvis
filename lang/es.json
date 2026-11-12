@@ -154,6 +154,7 @@
 	"The password must be at least 8 characters long.": "La contraseña debe tener al menos 8 caracteres.",
 	"The passwords do not match.": "Las contraseñas no coinciden.",
 	"The username may be at most %d characters long.": "El nombre de usuario puede tener como máximo %d caracteres.",
+	"The file contains more series than allowed; only the first %d were queued.": "El archivo contiene más series de las permitidas; solo se han puesto en cola las primeras %d.",
 	"The import was interrupted.": "La importación se interrumpió.",
 	"The series could not be loaded: %s": "No se pudo cargar la serie: %s",
 	"The series could not be reloaded: %s": "No se pudo recargar la serie: %s",

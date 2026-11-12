@@ -106,14 +106,14 @@ input[type="text"], input[type="password"], input[type="search"] {
 
 /* Einstellungsseite mit Umschaltern (Pill-Stil) */
 .sort-switch { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--muted); }
-.sort-switch a { padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
-.sort-switch a.active { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
+.sort-switch a, .sort-switch button { padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: none; font: inherit; cursor: pointer; }
+.sort-switch a.active, .sort-switch button.active { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
 .settings .sort-switch { margin-bottom: 1rem; flex-wrap: wrap; }
 .settings .sort-switch span { min-width: 6rem; }
 .settings-links { margin-top: 2rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
 .user-link { color: var(--muted); }
 .user-link:hover { color: var(--text); }
-.logout-link { color: var(--muted); display: inline-flex; align-items: center; }
+.logout-link { color: var(--muted); display: inline-flex; align-items: center; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .logout-link:hover { color: var(--text); }
 .logout-link svg { width: 1.1rem; height: 1.1rem; }
 

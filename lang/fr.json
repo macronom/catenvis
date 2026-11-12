@@ -197,5 +197,8 @@
 	"upcoming": "à venir",
 	"watched": "vu",
 	"yes": "oui",
-	"✓ watched": "✓ vu"
+	"✓ watched": "✓ vu",
+	"internal error (see the server log)": "erreur interne (voir le journal du serveur)",
+	"An unexpected error occurred.": "Une erreur inattendue s'est produite.",
+	"Error": "Erreur"
 }

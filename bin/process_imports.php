@@ -23,6 +23,7 @@ use Catenvis\Repository\UserRepository;
 use Catenvis\Repository\WatchRepository;
 use Catenvis\SeriesService;
 use Catenvis\TmdbClient;
+use Catenvis\TmdbException;
 
 if (PHP_SAPI !== 'cli') {
 	fwrite(STDERR, "Can only be run from the command line.\n");
@@ -96,8 +97,16 @@ while (($item = $queue->nextPending($lastUserId)) !== null) {
 		$queue->setResult($id, 'done', (string) ($match['name'] ?? ''));
 		$processed++;
 	} catch (\Throwable $e) {
+		// Shown on the import page: TMDB messages carry only endpoint and
+		// status; anything else (database, internal) stays in the log.
+		if ($e instanceof TmdbException) {
+			$message = ImportQueueRepository::fitMessage($e->getMessage());
+		} else {
+			$message = 'Import failed.';
+			fwrite(STDERR, sprintf("  Entry %d (%s): %s: %s\n", $id, $imdbId, $e::class, $e->getMessage()));
+		}
 		try {
-			$queue->setResult($id, 'failed', ImportQueueRepository::fitMessage($e->getMessage()));
+			$queue->setResult($id, 'failed', $message);
 		} catch (\Throwable $inner) {
 			// The entry stays in processing; the next worker start fails it.
 			fwrite(STDERR, $inner->getMessage() . "\n");

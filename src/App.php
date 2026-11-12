@@ -13,6 +13,7 @@ use Catenvis\Repository\SeriesRepository;
 use Catenvis\Repository\StatsRepository;
 use Catenvis\Repository\UserRepository;
 use Catenvis\Repository\WatchRepository;
+use Throwable;
 
 /**
  * Central application container: creates and holds the services and
@@ -65,6 +66,9 @@ final class App {
 		$this->config = Config::load($this->projectDir . '/config/config.php');
 
 		$this->configureErrorReporting();
+		if (PHP_SAPI !== 'cli') {
+			set_exception_handler($this->handleUncaught(...));
+		}
 
 		/** @var array<string, mixed> $dbConfig */
 		$dbConfig = $this->config->get('db', []);
@@ -137,6 +141,54 @@ final class App {
 		}
 
 		return $this->translator->translate($text, ...$args);
+	}
+
+	/**
+	 * Text of an exception that may be shown to users. TMDB errors carry only
+	 * the endpoint and status code; anything else (database, internal) could
+	 * reveal table or database names, so it is logged and replaced by a
+	 * generic text.
+	 */
+	public function publicErrorMessage(Throwable $e): string {
+		if ($e instanceof TmdbException) {
+			return $e->getMessage();
+		}
+		self::logThrowable($e);
+
+		return $this->t('internal error (see the server log)');
+	}
+
+	/**
+	 * Writes an exception with class, location and trace to the PHP error log.
+	 */
+	public static function logThrowable(Throwable $e): void {
+		error_log(sprintf("Catenvis: %s: %s in %s:%d\n%s", $e::class, $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString()));
+	}
+
+	/**
+	 * Last resort for exceptions no controller caught: log them and answer
+	 * with HTTP 500 and the error page. Details only outside production.
+	 */
+	private function handleUncaught(Throwable $e): void {
+		self::logThrowable($e);
+		if (!headers_sent()) {
+			http_response_code(500);
+		}
+
+		$message = $this->t('An unexpected error occurred.');
+		if (!$this->config->isProduction()) {
+			$message .= sprintf(' %s: %s (%s:%d)', $e::class, $e->getMessage(), $e->getFile(), $e->getLine());
+		}
+
+		try {
+			if (isset($this->view)) {
+				$this->view->render('error', ['pageTitle' => $this->t('Error'), 'message' => $message]);
+				return;
+			}
+		} catch (Throwable) {
+			// The page itself failed (e.g. no session or user yet): plain text below.
+		}
+		echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
 	}
 
 	/**
@@ -321,53 +373,42 @@ final class App {
 	 */
 	public function verifyCsrf(Request $request): void {
 		$token = $this->session->get(Session::CSRF_KEY);
-		if (!is_string($token) || !hash_equals($token, $request->getString('_csrf'))) {
+		if (!is_string($token) || !hash_equals($token, $request->bodyString('_csrf'))) {
 			http_response_code(400);
 			exit($this->t('Invalid CSRF token.'));
 		}
 	}
 
 	/**
-	 * Resolves a display preference: an explicit (valid) request value wins
-	 * and is stored per user in the database, otherwise the stored value
-	 * applies, otherwise the default. Without login the default always applies.
+	 * The stored display preference of the logged-in user if it is valid,
+	 * otherwise the default (always the default without login). Read-only:
+	 * preferences are changed only via POST /settings.
 	 *
 	 * @param list<string> $allowed Allowed values (whitelist).
 	 */
-	public function preference(Request $request, string $param, array $allowed, string $default, string $column): string {
-		$userId = $this->auth->userId();
-		if ($userId === null) {
+	public function preference(string $column, array $allowed, string $default): string {
+		if ($this->auth->userId() === null) {
 			return $default;
 		}
-
-		$value = $request->getString($param);
-		if (in_array($value, $allowed, true)) {
-			$this->users->updatePreference($userId, $column, $value);
-			return $value;
-		}
-
 		$stored = (string) ($this->auth->user()[$column] ?? '');
-		if (in_array($stored, $allowed, true)) {
-			return $stored;
-		}
 
-		return $default;
+		return in_array($stored, $allowed, true) ? $stored : $default;
 	}
 
 	/**
-	 * Resolves content language and title mode from request/user setting and
-	 * exposes them to the templates ($contentLang, $titleLang, helper $title(row)).
+	 * Resolves content language and title mode from the user's stored setting
+	 * and exposes them to the templates ($contentLang, $titleLang, helper $title(row)).
 	 * Legacy values pref_titlelang='de' fall back to 'own' via the whitelist.
 	 */
-	public function resolveTitleLanguage(Request $request): void {
+	public function resolveTitleLanguage(): void {
 		// Logged out (login page, forced password change) the browser language
 		// applies when a matching catalog is installed, otherwise the base
 		// language of the installation; users get their stored preference.
 		$default = $this->auth->isLoggedIn()
 			? $this->baseLang
 			: ($this->browserLanguage() ?? $this->baseLang);
-		$this->contentLang = $this->preference($request, 'lang', array_keys($this->languages()), $default, 'pref_lang');
-		$mode = $this->preference($request, 'titlelang', ['own', 'original'], 'own', 'pref_titlelang');
+		$this->contentLang = $this->preference('pref_lang', array_keys($this->languages()), $default);
+		$mode = $this->preference('pref_titlelang', ['own', 'original'], 'own');
 		$this->titleLang = $mode === 'original' ? 'original' : $this->contentLang;
 		$this->translator = new Translator($this->projectDir, $this->contentLang);
 

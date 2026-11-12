@@ -27,9 +27,12 @@
 	<?php if ($auth->isLoggedIn()): ?>
 		<div class="userbox">
 			<a class="user-link" href="<?= $e($url('/settings')) ?>"><?= $e($currentUser['username'] ?? '') ?></a>
-			<a class="logout-link" href="<?= $e($url('/logout')) ?>" title="<?= $e($t('Log out')) ?>" aria-label="<?= $e($t('Log out')) ?>">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-			</a>
+			<form method="post" action="<?= $e($url('/logout')) ?>" class="inline-form">
+				<input type="hidden" name="_csrf" value="<?= $e($app->csrfToken()) ?>">
+				<button type="submit" class="logout-link" title="<?= $e($t('Log out')) ?>" aria-label="<?= $e($t('Log out')) ?>">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+				</button>
+			</form>
 		</div>
 	<?php endif; ?>
 </header>

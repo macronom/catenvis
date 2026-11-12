@@ -82,6 +82,7 @@ final class LoginController {
 	 * Meldet den User ab.
 	 */
 	public function logout(Request $request): void {
+		$this->app->verifyCsrf($request);
 		$this->app->auth->logout();
 		$this->app->redirect('/login');
 	}

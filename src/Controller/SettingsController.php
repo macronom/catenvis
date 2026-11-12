@@ -21,14 +21,14 @@ final class SettingsController {
 	}
 
 	/**
-	 * Shows the settings page; clicking an option saves it immediately.
-	 * The title language is already handled globally in App::resolveTitleLanguage.
+	 * Shows the settings page; each option is a small POST form (save()).
+	 * Language and title mode are resolved globally in App::resolveTitleLanguage.
 	 */
 	public function show(Request $request): void {
 		$this->app->requireLogin();
 
-		$sort = $this->app->preference($request, 'sort', ['default', 'name'], 'default', 'pref_sort');
-		$view = $this->app->preference($request, 'view', ['grid', 'list'], 'grid', 'pref_view');
+		$sort = $this->app->preference('pref_sort', ['default', 'name'], 'default');
+		$view = $this->app->preference('pref_view', ['grid', 'list'], 'grid');
 
 		$this->app->view->render('settings', [
 			'pageTitle' => $this->app->t('Settings'),
@@ -36,5 +36,30 @@ final class SettingsController {
 			'view'      => $view,
 			'languages' => $this->app->languages(),
 		]);
+	}
+
+	/**
+	 * Saves the submitted display preferences (whitelisted per field; unknown
+	 * or invalid values are ignored) and returns to the settings page.
+	 */
+	public function save(Request $request): void {
+		$this->app->requireLogin();
+		$this->app->verifyCsrf($request);
+		$userId = (int) $this->app->auth->userId();
+
+		$options = [
+			'sort'      => ['pref_sort', ['default', 'name']],
+			'view'      => ['pref_view', ['grid', 'list']],
+			'lang'      => ['pref_lang', array_keys($this->app->languages())],
+			'titlelang' => ['pref_titlelang', ['own', 'original']],
+		];
+		foreach ($options as $field => [$column, $allowed]) {
+			$value = $request->bodyString($field);
+			if (in_array($value, $allowed, true)) {
+				$this->app->users->updatePreference($userId, $column, $value);
+			}
+		}
+
+		$this->app->redirect('/settings');
 	}
 }

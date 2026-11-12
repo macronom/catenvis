@@ -23,7 +23,7 @@ require $projectDir . '/vendor/autoload.php';
 $app = new App($projectDir);
 
 $request  = Request::fromGlobals((string) $app->config->get('base_url', ''));
-$app->resolveTitleLanguage($request);
+$app->resolveTitleLanguage();
 $login    = new LoginController($app);
 $dashboard = new DashboardController($app);
 $series   = new SeriesController($app);
@@ -38,14 +38,15 @@ $router = new Router();
 // Public routes (login).
 $router->add('GET',  '/login',  [$login, 'showLogin']);
 $router->add('POST', '/login',  [$login, 'login']);
-$router->add('GET',  '/logout', [$login, 'logout']);
+$router->add('POST', '/logout', [$login, 'logout']);
 
 // Password change.
 $router->add('GET',  '/change-password', [$login, 'showChangePassword']);
 $router->add('POST', '/change-password', [$login, 'changePassword']);
 
 // Personal area (settings, statistics).
-$router->add('GET', '/settings', [$settings, 'show']);
+$router->add('GET',  '/settings', [$settings, 'show']);
+$router->add('POST', '/settings', [$settings, 'save']);
 $router->add('GET', '/stats',     [$stats, 'index']);
 $router->add('GET', '/stats/top', [$stats, 'topMore']);
 

@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 return [
 	// 'production' hides PHP errors, 'development' shows them.
-	'environment' => 'development',
+	'environment' => 'production',
 
 	// Base URL path the application is served from (no trailing slash).
 	// Typically '' (domain root); for a subdirectory e.g. '/catenvis'.

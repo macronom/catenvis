@@ -31,8 +31,8 @@ final class DashboardController {
 		$userId = (int) $this->app->auth->userId();
 
 		// View/sorting: per-user stored preference, otherwise the default.
-		$sort = $this->resolvePreference($request, 'sort', ['default', 'name'], 'default', 'pref_sort');
-		$view = $this->resolvePreference($request, 'view', ['grid', 'list'], 'grid', 'pref_view');
+		$sort = $this->app->preference('pref_sort', ['default', 'name'], 'default');
+		$view = $this->app->preference('pref_view', ['grid', 'list'], 'grid');
 
 		$this->app->view->render('dashboard', [
 			'pageTitle'      => $this->app->t('My series'),
@@ -83,14 +83,5 @@ final class DashboardController {
 	 */
 	private function sortMode(Request $request): string {
 		return $request->getString('sort') === 'name' ? 'name' : 'default';
-	}
-
-	/**
-	 * Resolves a display preference (delegates to App::preference).
-	 *
-	 * @param list<string> $allowed Allowed values (whitelist).
-	 */
-	private function resolvePreference(Request $request, string $param, array $allowed, string $default, string $column): string {
-		return $this->app->preference($request, $param, $allowed, $default, $column);
 	}
 }

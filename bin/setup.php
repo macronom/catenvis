@@ -108,7 +108,12 @@ if ($hasUsers > 0 && !$force) {
 }
 
 // 5. Remaining settings.
+// Anything but exactly 'production' turns the error display on.
 $environment = promptDefault('Environment (production/development)', 'production');
+while (!in_array($environment, ['production', 'development'], true)) {
+	fwrite(STDERR, "Please enter exactly 'production' or 'development'.\n");
+	$environment = promptDefault('Environment (production/development)', 'production');
+}
 $baseUrl     = promptDefault('Base URL path (e.g. /catenvis, empty for domain root)', '');
 $tmdbToken   = promptHidden('TMDB v4 read access token (leave empty to use a v3 key): ');
 $tmdbKey     = $tmdbToken === '' ? promptHidden('TMDB v3 API key: ') : '';
@@ -200,6 +205,9 @@ echo "\nSetup complete. Next:\n";
 echo "  - Point your web server at html/ (see deploy/SETUP.md).\n";
 echo "  - Install the update cron (deploy/catenvis.cron).\n";
 echo "  - Open the site and log in as \"$adminUser\" to set a new password.\n";
+echo "  - Restrict config/config.php (it holds the passwords) to its owner and the\n";
+echo "    web server group, e.g. on Debian/Ubuntu:\n";
+echo "      sudo chgrp www-data $configPath && sudo chmod 640 $configPath\n";
 
 /**
  * Prompts with a default; an empty answer keeps the default.

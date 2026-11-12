@@ -5,34 +5,35 @@
 
 /**
  * Erwartet: $sort, $view, $languages (ISO => Label) sowie die geteilten
- * $titleLang, $contentLang, $auth, $e, $url.
+ * $titleLang, $contentLang, $auth, $app, $e, $url.
  */
 ?>
 <section class="settings">
 	<h1><?= $e($t('Settings')) ?></h1>
 
 	<?php if (!$auth->isAdmin()): ?>
-		<div class="sort-switch">
-			<span><?= $e($t('Sort:')) ?></span>
-			<a href="<?= $e($url('/settings?sort=default')) ?>" class="<?= $sort !== 'name' ? 'active' : '' ?>"><?= $e($t('Progress')) ?></a>
-			<a href="<?= $e($url('/settings?sort=name')) ?>" class="<?= $sort === 'name' ? 'active' : '' ?>"><?= $e($t('Name')) ?></a>
-		</div>
-		<div class="sort-switch">
-			<span><?= $e($t('View:')) ?></span>
-			<a href="<?= $e($url('/settings?view=grid')) ?>" class="<?= $view !== 'list' ? 'active' : '' ?>"><?= $e($t('Tiles')) ?></a>
-			<a href="<?= $e($url('/settings?view=list')) ?>" class="<?= $view === 'list' ? 'active' : '' ?>"><?= $e($t('List')) ?></a>
-		</div>
-		<div class="sort-switch">
-			<span><?= $e($t('Language:')) ?></span>
-			<?php foreach ($languages as $code => $label): ?>
-				<a href="<?= $e($url('/settings?lang=' . $code)) ?>" class="<?= $contentLang === $code ? 'active' : '' ?>"><?= $e($label) ?></a>
-			<?php endforeach; ?>
-		</div>
-		<div class="sort-switch">
-			<span><?= $e($t('Series titles:')) ?></span>
-			<a href="<?= $e($url('/settings?titlelang=own')) ?>" class="<?= $titleLang !== 'original' ? 'active' : '' ?>"><?= $e($t('My language')) ?></a>
-			<a href="<?= $e($url('/settings?titlelang=original')) ?>" class="<?= $titleLang === 'original' ? 'active' : '' ?>"><?= $e($t('Original')) ?></a>
-		</div>
+		<?php
+		// Each group is one POST form; the clicked button submits its value.
+		$groups = [
+			['label' => $t('Sort:'), 'field' => 'sort', 'current' => $sort === 'name' ? 'name' : 'default',
+				'options' => ['default' => $t('Progress'), 'name' => $t('Name')]],
+			['label' => $t('View:'), 'field' => 'view', 'current' => $view === 'list' ? 'list' : 'grid',
+				'options' => ['grid' => $t('Tiles'), 'list' => $t('List')]],
+			['label' => $t('Language:'), 'field' => 'lang', 'current' => $contentLang,
+				'options' => $languages],
+			['label' => $t('Series titles:'), 'field' => 'titlelang', 'current' => $titleLang === 'original' ? 'original' : 'own',
+				'options' => ['own' => $t('My language'), 'original' => $t('Original')]],
+		];
+		?>
+		<?php foreach ($groups as $group): ?>
+			<form method="post" action="<?= $e($url('/settings')) ?>" class="sort-switch">
+				<input type="hidden" name="_csrf" value="<?= $e($app->csrfToken()) ?>">
+				<span><?= $e($group['label']) ?></span>
+				<?php foreach ($group['options'] as $value => $label): ?>
+					<button type="submit" name="<?= $e($group['field']) ?>" value="<?= $e($value) ?>" class="<?= $group['current'] === (string) $value ? 'active' : '' ?>"><?= $e($label) ?></button>
+				<?php endforeach; ?>
+			</form>
+		<?php endforeach; ?>
 	<?php endif; ?>
 
 	<div class="settings-links">

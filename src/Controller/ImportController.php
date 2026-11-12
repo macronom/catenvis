@@ -108,8 +108,7 @@ final class ImportController {
 
 		// Discard the old history, enqueue the new batch, kick off the worker.
 		$markSeen = $request->getBool('mark_seen');
-		$this->app->importQueue->clear($userId);
-		$this->app->importQueue->enqueue($userId, $consts, $markSeen);
+		$this->app->importQueue->replaceForUser($userId, $consts, $markSeen);
 		$this->spawnWorker();
 
 		$this->app->session->flash('success', $this->app->t(

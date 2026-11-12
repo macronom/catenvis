@@ -26,6 +26,21 @@ final class ImportQueueRepository {
 	}
 
 	/**
+	 * Replaces a user's queue (results of the previous import included) with
+	 * a new batch, atomically: a failure leaves the old state, never a
+	 * half-filled queue the worker would start on.
+	 *
+	 * @param array<string, string> $items    Map imdbId => title.
+	 * @param bool                   $markSeen Whether completed seasons should be marked as watched.
+	 */
+	public function replaceForUser(int $userId, array $items, bool $markSeen = false): void {
+		$this->db->transaction(function () use ($userId, $items, $markSeen): void {
+			$this->clear($userId);
+			$this->enqueue($userId, $items, $markSeen);
+		});
+	}
+
+	/**
 	 * Enqueues multiple series into the queue.
 	 *
 	 * @param array<string, string> $items    Map imdbId => title.

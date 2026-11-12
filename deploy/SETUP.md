@@ -32,7 +32,7 @@ sudo mkdir -p /var/www/catenvis
 sudo chown "$USER":"$USER" /var/www/catenvis
 
 # Check required extensions
-php -m | grep -E 'pdo_mysql|curl'
+php -m | grep -E 'pdo_mysql|curl|mbstring|ctype'
 ```
 
 ## 3. First deployment (from the development machine)
@@ -52,6 +52,16 @@ It asks for the database and TMDB credentials, writes `config/config.php`,
 loads the schema and creates the first admin account (use `base_url`
 `/catenvis`). `deploy.sh` never touches `config/config.php` afterwards, so this
 is a one-time step. All options are documented in `config/config.sample.php`.
+
+`config/config.php` holds the database password and the TMDB token, and is
+created readable for every local account. Restrict it to its owner and the
+web server's group (`www-data` on Debian/Ubuntu; Apache and the cron job run
+as that user):
+
+```bash
+sudo chgrp www-data /var/www/catenvis/config/config.php
+sudo chmod 640 /var/www/catenvis/config/config.php
+```
 
 ## 4. Enable the Apache config (on the server)
 
@@ -107,6 +117,13 @@ deploy/deploy.sh
 ```
 
 - `config/config.php` and `catenvis.log` on the server are left untouched.
+- Local-only files (files excluded from Git locally via `.git/info/exclude`,
+  `deploy/deploy.env`, `tests/`, test and analysis configs) are not deployed.
+  rsync does not delete excluded files on the server, so copies from older
+  deployments must be removed there by hand.
+- `vendor/` is deployed as is, including the dev packages (PHPUnit, PHPStan):
+  Composer's autoloader loads some of their files at startup. It lies outside
+  the web root, so nothing of it is reachable over HTTP.
 - Database migrations are not applied automatically. After deploying a
   version that ships new files in `sql/migrations/`, run on the server:
 

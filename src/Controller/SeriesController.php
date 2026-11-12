@@ -103,7 +103,7 @@ final class SeriesController {
 				};
 				usort($results, static fn(array $a, array $b): int => $score($b) <=> $score($a));
 			} catch (Throwable $e) {
-				$error = $this->app->t('The TMDB search failed: %s', $e->getMessage());
+				$error = $this->app->t('The TMDB search failed: %s', $this->app->publicErrorMessage($e));
 			}
 		}
 
@@ -138,7 +138,7 @@ final class SeriesController {
 			$this->app->session->flash('success', $this->app->t('Series added.'));
 			$this->app->redirect('/series/' . $seriesId);
 		} catch (Throwable $e) {
-			$this->app->session->flash('error', $this->app->t('The series could not be loaded: %s', $e->getMessage()));
+			$this->app->session->flash('error', $this->app->t('The series could not be loaded: %s', $this->app->publicErrorMessage($e)));
 			$this->app->redirect('/add');
 		}
 	}
@@ -171,7 +171,12 @@ final class SeriesController {
 		$seriesId = $request->getInt('series_id');
 		$status   = $request->getString('status');
 
-		if ($seriesId > 0 && in_array($status, ['following', 'stopped', 'deferred'], true)) {
+		// Only series in the cache: the follow row needs the series row (FK).
+		if ($seriesId <= 0 || $this->app->series->find($seriesId) === null) {
+			$this->app->redirect('/');
+		}
+
+		if (in_array($status, ['following', 'stopped', 'deferred'], true)) {
 			$this->app->series->setFollowStatus($userId, $seriesId, $status);
 			$message = match ($status) {
 				'following' => $this->app->t('You are following this series again.'),
@@ -204,7 +209,7 @@ final class SeriesController {
 			$this->app->seriesService()->sync($seriesId, true);
 			$this->app->session->flash('success', $this->app->t('Series reloaded from TMDB.'));
 		} catch (Throwable $e) {
-			$this->app->session->flash('error', $this->app->t('The series could not be reloaded: %s', $e->getMessage()));
+			$this->app->session->flash('error', $this->app->t('The series could not be reloaded: %s', $this->app->publicErrorMessage($e)));
 		}
 
 		$this->app->redirect('/series/' . $seriesId);

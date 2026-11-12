@@ -139,4 +139,23 @@ final class RequestTest extends TestCase {
 
 		self::assertSame([1, 2], $request->getIntList('ids'));
 	}
+
+	public function testBodyStringIgnoresTheQueryString(): void {
+		$request = new Request(['_csrf' => 'from-url'], [], ['REQUEST_METHOD' => 'POST']);
+
+		self::assertSame('', $request->bodyString('_csrf'));
+		self::assertSame('from-url', $request->getString('_csrf'));
+	}
+
+	public function testBodyStringReadsAndTrimsTheBody(): void {
+		$request = new Request(['_csrf' => 'from-url'], ['_csrf' => ' token '], ['REQUEST_METHOD' => 'POST']);
+
+		self::assertSame('token', $request->bodyString('_csrf'));
+	}
+
+	public function testBodyStringRejectsArrays(): void {
+		$request = new Request([], ['_csrf' => ['a']], ['REQUEST_METHOD' => 'POST']);
+
+		self::assertSame('', $request->bodyString('_csrf'));
+	}
 }

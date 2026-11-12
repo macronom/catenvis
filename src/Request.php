@@ -68,6 +68,16 @@ final class Request {
 		return is_scalar($value) ? trim((string) $value) : $default;
 	}
 
+	/**
+	 * A trimmed string from the request body only (never the query string),
+	 * e.g. for the CSRF token, which must not travel in URLs.
+	 */
+	public function bodyString(string $key, string $default = ''): string {
+		$value = $this->body[$key] ?? null;
+
+		return is_scalar($value) ? trim((string) $value) : $default;
+	}
+
 	public function getInt(string $key, int $default = 0): int {
 		$value = $this->body[$key] ?? $this->query[$key] ?? null;
 

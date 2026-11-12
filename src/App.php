@@ -307,10 +307,10 @@ final class App {
 	 * Returns the CSRF token of the current session (creating it if needed).
 	 */
 	public function csrfToken(): string {
-		$token = $this->session->get('_csrf');
+		$token = $this->session->get(Session::CSRF_KEY);
 		if (!is_string($token)) {
 			$token = bin2hex(random_bytes(32));
-			$this->session->set('_csrf', $token);
+			$this->session->set(Session::CSRF_KEY, $token);
 		}
 
 		return $token;
@@ -320,7 +320,7 @@ final class App {
 	 * Verifies the CSRF token of a POST request; aborts on failure.
 	 */
 	public function verifyCsrf(Request $request): void {
-		$token = $this->session->get('_csrf');
+		$token = $this->session->get(Session::CSRF_KEY);
 		if (!is_string($token) || !hash_equals($token, $request->getString('_csrf'))) {
 			http_response_code(400);
 			exit($this->t('Invalid CSRF token.'));

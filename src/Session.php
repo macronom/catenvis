@@ -11,6 +11,9 @@ namespace Catenvis;
  * Wraps the native PHP session including flash messages.
  */
 final class Session {
+	/** Session key of the CSRF token (see App::csrfToken). */
+	public const CSRF_KEY = '_csrf';
+
 	/**
 	 * Starts the session if not already started.
 	 *
@@ -22,6 +25,12 @@ final class Session {
 		if (session_status() === PHP_SESSION_ACTIVE) {
 			return;
 		}
+
+		// Pin the session id handling regardless of the host's php.ini:
+		// only accept ids issued by this server and only via the cookie.
+		ini_set('session.use_strict_mode', '1');
+		ini_set('session.use_only_cookies', '1');
+		ini_set('session.use_trans_sid', '0');
 
 		// Keep server-side session data at least as long as the cookie,
 		// otherwise the session is cleaned up prematurely despite a valid cookie.
@@ -54,7 +63,7 @@ final class Session {
 	 * @param int $lifetime New lifetime in seconds (0 = until browser close).
 	 */
 	public function regenerateWithLifetime(int $lifetime): void {
-		session_regenerate_id(true);
+		$this->renewId();
 
 		$name = session_name();
 		$id   = session_id();
@@ -90,10 +99,21 @@ final class Session {
 	}
 
 	/**
-	 * Renews the session ID (against session fixation), keeps the data.
+	 * Renews the session ID (against session fixation). Keeps the data except
+	 * the CSRF token.
 	 */
 	public function regenerate(): void {
+		$this->renewId();
+	}
+
+	/**
+	 * Rotates the session ID and discards the CSRF token, so a token known
+	 * before a login or logout (e.g. from a planted anonymous session) is
+	 * not valid afterwards. App::csrfToken creates a fresh one on next use.
+	 */
+	private function renewId(): void {
 		session_regenerate_id(true);
+		unset($_SESSION[self::CSRF_KEY]);
 	}
 
 	/**

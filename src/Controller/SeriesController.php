@@ -31,7 +31,11 @@ final class SeriesController {
 		$userId   = (int) $this->app->auth->userId();
 		$seriesId = (int) ($params['id'] ?? 0);
 
-		$series = $this->app->series->find($seriesId, $this->app->contentLang);
+		// Only for followers (any status): the shared cache must not reveal
+		// which titles other users of the instance have.
+		$series = $this->app->series->followStatus($userId, $seriesId) !== null
+			? $this->app->series->find($seriesId, $this->app->contentLang)
+			: null;
 		if ($series === null) {
 			http_response_code(404);
 			$this->app->view->render('error', ['pageTitle' => $this->app->t('Not found'), 'message' => $this->app->t('Series not found.')]);
@@ -162,7 +166,8 @@ final class SeriesController {
 	}
 
 	/**
-	 * Sets the follow status (following/stopped/deferred).
+	 * Changes the status (following/stopped/deferred) of an existing follow.
+	 * New follows are created only via add().
 	 */
 	public function setStatus(Request $request): void {
 		$this->app->requireUser();
@@ -171,8 +176,9 @@ final class SeriesController {
 		$seriesId = $request->getInt('series_id');
 		$status   = $request->getString('status');
 
-		// Only series in the cache: the follow row needs the series row (FK).
-		if ($seriesId <= 0 || $this->app->series->find($seriesId) === null) {
+		// Without a follow the answer is the same for a series another user
+		// has and for an unknown one, so the shared cache is not revealed.
+		if ($seriesId <= 0 || $this->app->series->followStatus($userId, $seriesId) === null) {
 			$this->app->redirect('/');
 		}
 
@@ -198,7 +204,8 @@ final class SeriesController {
 		$this->app->verifyCsrf($request);
 		$seriesId = $request->getInt('series_id');
 
-		if ($seriesId <= 0 || $this->app->series->find($seriesId) === null) {
+		// Followers only, like the series page the button lives on.
+		if ($seriesId <= 0 || $this->app->series->followStatus((int) $this->app->auth->userId(), $seriesId) === null) {
 			$this->app->redirect('/');
 		}
 

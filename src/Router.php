@@ -32,7 +32,8 @@ final class Router {
 
 		$this->routes[] = [
 			'method'  => strtoupper($method),
-			'regex'   => '#^' . $regex . '$#',
+			// \z, not $: $ also matches before a trailing newline.
+			'regex'   => '#\A' . $regex . '\z#',
 			'params'  => $params,
 			'handler' => $handler,
 		];

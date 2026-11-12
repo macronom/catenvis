@@ -118,6 +118,10 @@ final class LoginController {
 			$this->app->session->flash('error', $this->app->t('The passwords do not match.'));
 			$this->app->redirect('/change-password');
 		}
+		if ($new === $current) {
+			$this->app->session->flash('error', $this->app->t('The new password must differ from the current one.'));
+			$this->app->redirect('/change-password');
+		}
 
 		$this->app->auth->changePassword($new);
 		$this->app->session->flash('success', $this->app->t('Password changed. Please log in with your new password.'));

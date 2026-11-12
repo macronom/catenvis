@@ -27,21 +27,30 @@ final class WatchController {
 		$this->app->requireUser();
 		$this->app->verifyCsrf($request);
 
-		$userId   = (int) $this->app->auth->userId();
-		$seriesId = $request->getInt('series_id');
-		$scope    = $request->getString('scope');    // episode | season | series
-		$action   = $request->getString('action');   // watch | unwatch
-		$return   = $request->getString('return');   // '' | 'dashboard'
-		$watch    = $action !== 'unwatch';
+		$userId    = (int) $this->app->auth->userId();
+		$scope     = $request->getString('scope');    // episode | season | series
+		$action    = $request->getString('action');   // watch | unwatch
+		$return    = $request->getString('return');   // '' | 'dashboard'
+		$watch     = $action !== 'unwatch';
+		$episodeId = $request->getInt('episode_id');
+		// For a single episode the series is taken from the episode itself,
+		// not from the request.
+		$seriesId  = $scope === 'episode'
+			? ($episodeId > 0 ? ($this->app->series->seriesIdOfEpisode($episodeId) ?? 0) : 0)
+			: $request->getInt('series_id');
+
+		// Followed series only (any status). Without a follow the answer is
+		// the same for a series another user has and for an unknown one, so
+		// the shared cache is not revealed.
+		if ($seriesId <= 0 || $this->app->series->followStatus($userId, $seriesId) === null) {
+			$this->app->redirect('/');
+		}
 
 		switch ($scope) {
 			case 'episode':
-				$episodeId = $request->getInt('episode_id');
-				if ($episodeId > 0) {
-					$watch
-						? $this->app->watch->markEpisode($userId, $episodeId)
-						: $this->app->watch->unmarkEpisode($userId, $episodeId);
-				}
+				$watch
+					? $this->app->watch->markEpisode($userId, $episodeId)
+					: $this->app->watch->unmarkEpisode($userId, $episodeId);
 				break;
 
 			case 'season':
@@ -63,7 +72,7 @@ final class WatchController {
 		if ($return === 'dashboard') {
 			// Whoever ticks off an episode of a deferred series is obviously
 			// following it again – reactivate the status automatically.
-			if ($scope === 'episode' && $watch && $seriesId > 0) {
+			if ($scope === 'episode' && $watch) {
 				$follow = $this->app->series->followStatus($userId, $seriesId);
 				if (($follow['status'] ?? null) === 'deferred') {
 					$this->app->series->setFollowStatus($userId, $seriesId, 'following');

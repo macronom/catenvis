@@ -466,6 +466,15 @@ final class SeriesRepository {
 	}
 
 	/**
+	 * The series an episode belongs to, or null for an unknown episode.
+	 */
+	public function seriesIdOfEpisode(int $episodeId): ?int {
+		$value = $this->db->fetchValue('SELECT series_id FROM episodes WHERE id = ?', [$episodeId]);
+
+		return $value === null ? null : (int) $value;
+	}
+
+	/**
 	 * Whether anybody follows the series (in any status).
 	 */
 	public function hasFollowers(int $seriesId): bool {

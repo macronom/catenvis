@@ -200,5 +200,6 @@
 	"✓ watched": "✓ visto",
 	"internal error (see the server log)": "errore interno (vedi il log del server)",
 	"An unexpected error occurred.": "Si è verificato un errore imprevisto.",
-	"Error": "Errore"
+	"Error": "Errore",
+	"The new password must differ from the current one.": "La nuova password deve essere diversa da quella attuale."
 }

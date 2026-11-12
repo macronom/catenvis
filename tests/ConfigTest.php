@@ -84,6 +84,17 @@ final class ConfigTest extends TestCase {
 		self::assertFalse($this->makeConfig([])->isProduction());
 	}
 
+	public function testImportWorkDirDefaultsToTheTempDirectory(): void {
+		$temp = rtrim(sys_get_temp_dir(), '/');
+
+		self::assertSame($temp, $this->makeConfig([])->importWorkDir());
+		self::assertSame($temp, $this->makeConfig(['import' => ['work_dir' => '  ']])->importWorkDir());
+	}
+
+	public function testImportWorkDirUsesTheConfiguredDirectoryWithoutTrailingSlash(): void {
+		self::assertSame('/var/lib/catenvis', $this->makeConfig(['import' => ['work_dir' => '/var/lib/catenvis/']])->importWorkDir());
+	}
+
 	/**
 	 * @param array<string, mixed> $values
 	 */

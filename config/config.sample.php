@@ -58,6 +58,18 @@ return [
 		'logo_base_url'     => 'https://image.tmdb.org/t/p/w92',
 	],
 
+	'import' => [
+		// Directory for the IMDb import worker's lock and log file
+		// (catenvis_import.lock / catenvis_import.log). Empty = the system
+		// temp directory. Caveat: Apache under systemd usually gets a private
+		// /tmp (PrivateTmp), so a worker started by hand would use a different
+		// lock file than one started from the import page, and both could run
+		// at once. To run workers by hand, set a directory writable by the web
+		// server user (e.g. /var/lib/catenvis) and start them as that user
+		// (sudo -u www-data php bin/process_imports.php).
+		'work_dir' => '',
+	],
+
 	'update' => [
 		// Global "stale data" warning. When the newest successful series sync
 		// is at least this many days old, a banner tells logged-in users the

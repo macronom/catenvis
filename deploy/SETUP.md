@@ -10,7 +10,9 @@ to the MySQL database configured in `config/config.php`.
 
 Create an (empty) MySQL/MariaDB database and a user for it - the `CREATE
 DATABASE` / `CREATE USER` / `GRANT` statements are in the header of
-[`sql/schema.sql`](../sql/schema.sql). This is the only step that needs
+[`sql/schema.sql`](../sql/schema.sql). Bind the user to the host the
+application connects from (not `'%'`) and grant only the listed privileges
+(data access plus what setup and migrations need), not `ALL PRIVILEGES`. This is the only step that needs
 database-admin (root) privileges; loading the schema itself is done for you by
 `bin/setup.php` in step 3, so no manual `mysql < schema.sql` is required. Later
 updates apply schema changes as deltas via `php bin/migrate.php` (see "Ongoing
@@ -80,13 +82,18 @@ sudo cp /var/www/catenvis/deploy/catenvis.cron /etc/cron.d/catenvis
 sudo chown root:root /etc/cron.d/catenvis
 sudo chmod 644 /etc/cron.d/catenvis
 
+# Log file for the cron job: it runs as www-data, which cannot create files
+# in /var/www/catenvis (owned by the deploy user)
+sudo touch /var/log/catenvis.log
+sudo chown www-data:adm /var/log/catenvis.log
+sudo chmod 640 /var/log/catenvis.log
+
 # Smoke test: run once by hand (checks DB + TMDB access); output goes to the terminal
 php /var/www/catenvis/bin/update_followed.php
 ```
 
-`catenvis.log` is created by the cron's output redirection, i.e. on the first
-scheduled run. After that you can watch it with
-`tail /var/www/catenvis/catenvis.log`.
+Each run appends to `/var/log/catenvis.log`; watch it with
+`tail /var/log/catenvis.log` (as a member of the `adm` group or with `sudo`).
 
 ## HTTPS (recommended for production)
 
@@ -116,7 +123,7 @@ After changing project files, a local call is enough:
 deploy/deploy.sh
 ```
 
-- `config/config.php` and `catenvis.log` on the server are left untouched.
+- `config/config.php` and log files on the server are left untouched.
 - Local-only files (files excluded from Git locally via `.git/info/exclude`,
   `deploy/deploy.env`, `tests/`, test and analysis configs) are not deployed.
   rsync does not delete excluded files on the server, so copies from older

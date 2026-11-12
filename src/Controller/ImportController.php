@@ -133,7 +133,7 @@ final class ImportController {
 		}
 		$php    = (string) $this->app->config->get('php_binary', '/usr/bin/php');
 		$worker = $this->app->projectDir() . '/bin/process_imports.php';
-		$log    = sys_get_temp_dir() . '/catenvis_import.log';
+		$log    = $this->app->config->importWorkDir() . '/catenvis_import.log';
 
 		$cmd = sprintf(
 			'nohup %s %s >> %s 2>&1 &',

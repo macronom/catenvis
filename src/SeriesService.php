@@ -56,7 +56,7 @@ final class SeriesService {
 		}
 
 		$externalIds     = is_array($details['external_ids'] ?? null) ? $details['external_ids'] : [];
-		$originalLanguage = $this->stringOrNull($details['original_language'] ?? null);
+		$originalLanguage = TmdbValue::languageCode($details['original_language'] ?? null);
 
 		// upsertSeries stamps synced_at right away; that early stamp keeps a
 		// series being added safe from SeriesRepository::deleteOrphans. If the
@@ -65,12 +65,12 @@ final class SeriesService {
 		$previousSync = $this->series->syncedAt($seriesId);
 		$this->series->upsertSeries([
 			'id'                 => $seriesId,
-			'original_name'      => (string) ($details['original_name'] ?? ''),
+			'original_name'      => TmdbValue::text($details['original_name'] ?? null),
 			'original_language'  => $originalLanguage,
-			'imdb_id'            => $this->stringOrNull($externalIds['imdb_id'] ?? null),
+			'imdb_id'            => TmdbValue::imdbId($externalIds['imdb_id'] ?? null),
 			'first_air_year'     => $this->year((string) ($details['first_air_date'] ?? '')),
-			'poster_path'        => $this->stringOrNull($details['poster_path'] ?? null),
-			'status'             => $this->stringOrNull($details['status'] ?? null),
+			'poster_path'        => TmdbValue::imagePath($details['poster_path'] ?? null),
+			'status'             => $this->optionalText($details['status'] ?? null, 64),
 			'networks'           => $this->networksJson($details['networks'] ?? null),
 			'number_of_seasons'  => (int) ($details['number_of_seasons'] ?? 0),
 			'number_of_episodes' => (int) ($details['number_of_episodes'] ?? 0),
@@ -102,8 +102,8 @@ final class SeriesService {
 				$this->series->upsertTranslation(
 					$seriesId,
 					$this->baseLang,
-					(string) ($details['name'] ?? ''),
-					$this->stringOrNull($details['overview'] ?? null)
+					TmdbValue::text($details['name'] ?? null),
+					TmdbValue::longText($details['overview'] ?? null)
 				);
 				continue;
 			}
@@ -234,8 +234,8 @@ final class SeriesService {
 				'episode_number' => (int) ($episode['episode_number'] ?? 0),
 				'air_date'       => $this->dateOrNull($episode['air_date'] ?? null),
 				'runtime'        => $this->intOrNull($episode['runtime'] ?? null),
-				'name'           => (string) ($episode['name'] ?? ''),
-				'overview'       => $this->stringOrNull($episode['overview'] ?? null),
+				'name'           => TmdbValue::text($episode['name'] ?? null),
+				'overview'       => TmdbValue::longText($episode['overview'] ?? null),
 			];
 		}
 		// An empty payload leaves the stored episodes untouched: parking them
@@ -265,8 +265,8 @@ final class SeriesService {
 		foreach ($episodes as $episode) {
 			$episodeId = (int) ($episode['id'] ?? 0);
 			if ($episodeId !== 0) {
-				$names[$episodeId]     = (string) ($episode['name'] ?? '');
-				$overviews[$episodeId] = $this->stringOrNull($episode['overview'] ?? null);
+				$names[$episodeId]     = TmdbValue::text($episode['name'] ?? null);
+				$overviews[$episodeId] = TmdbValue::longText($episode['overview'] ?? null);
 			}
 		}
 
@@ -307,12 +307,13 @@ final class SeriesService {
 		return null;
 	}
 
-	private function stringOrNull(mixed $value): ?string {
-		if (is_string($value) && $value !== '') {
-			return $value;
-		}
+	/**
+	 * Text cut to $maxChars characters (see TmdbValue::text), null when empty.
+	 */
+	private function optionalText(mixed $value, int $maxChars): ?string {
+		$text = TmdbValue::text($value, $maxChars);
 
-		return null;
+		return $text !== '' ? $text : null;
 	}
 
 	/**
@@ -342,11 +343,15 @@ final class SeriesService {
 
 		$list = [];
 		foreach ($networks as $network) {
-			$name = $this->stringOrNull($network['name'] ?? null);
+			$name = $this->optionalText($network['name'] ?? null, TmdbValue::NAME_LENGTH);
 			if ($name === null) {
 				continue;
 			}
-			$list[] = ['name' => $name, 'logo_path' => $this->stringOrNull($network['logo_path'] ?? null)];
+			$list[] = ['name' => $name, 'logo_path' => TmdbValue::imagePath($network['logo_path'] ?? null)];
+			// Bounds the TEXT column; real series list a handful at most.
+			if (count($list) === 20) {
+				break;
+			}
 		}
 
 		return $list === [] ? null : (string) json_encode($list);
@@ -372,8 +377,8 @@ final class SeriesService {
 				if (($translation['iso_639_1'] ?? null) !== $lang) {
 					continue;
 				}
-				$name     ??= $this->stringOrNull($translation['data']['name'] ?? null);
-				$overview ??= $this->stringOrNull($translation['data']['overview'] ?? null);
+				$name     ??= $this->optionalText($translation['data']['name'] ?? null, TmdbValue::NAME_LENGTH);
+				$overview ??= TmdbValue::longText($translation['data']['overview'] ?? null);
 				if ($name !== null && $overview !== null) {
 					break;
 				}
@@ -381,7 +386,7 @@ final class SeriesService {
 		}
 
 		if ($name === null && ($details['original_language'] ?? null) === $lang) {
-			$name = $this->stringOrNull($details['original_name'] ?? null);
+			$name = $this->optionalText($details['original_name'] ?? null, TmdbValue::NAME_LENGTH);
 		}
 
 		return ['name' => $name ?? '', 'overview' => $overview];

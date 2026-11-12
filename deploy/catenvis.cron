@@ -11,10 +11,11 @@
 # - Files in /etc/cron.d/ have an extra user field (here: www-data) - adjust
 #   it (and the paths) to match your environment.
 # - The file name must not contain a dot (cron would ignore it otherwise).
+# - The log file must exist and be writable for www-data (see deploy/SETUP.md).
 # - Changes are picked up by the cron daemon automatically (no reload needed).
 
 PATH=/usr/bin:/bin
 MAILTO=""
 
 # Minute Hour Day Month Weekday  User      Command
-31 6 * * *  www-data  /usr/bin/php /var/www/catenvis/bin/update_followed.php >> /var/www/catenvis/catenvis.log 2>&1
+31 6 * * *  www-data  /usr/bin/php /var/www/catenvis/bin/update_followed.php >> /var/log/catenvis.log 2>&1

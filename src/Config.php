@@ -60,6 +60,16 @@ final class Config {
 	}
 
 	/**
+	 * Directory for the import worker's lock and log file: import.work_dir,
+	 * or the system temp directory when unset or empty.
+	 */
+	public function importWorkDir(): string {
+		$dir = rtrim(trim((string) $this->get('import.work_dir', '')), '/');
+
+		return $dir !== '' ? $dir : rtrim(sys_get_temp_dir(), '/');
+	}
+
+	/**
 	 * Checks whether the application runs in production mode.
 	 */
 	public function isProduction(): bool {

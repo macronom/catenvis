@@ -15,6 +15,14 @@ use Catenvis\Repository\UserRepository;
 final class Auth {
 	private const SESSION_KEY = 'user_id';
 	private const SESSION_PW_TOKEN = 'pw_token';
+	/**
+	 * bcrypt hashes of random, discarded passwords. An unknown username is
+	 * verified against one of them, so the response takes as long as for a
+	 * real account and does not reveal which names exist. Cost 10 matches
+	 * PASSWORD_DEFAULT up to PHP 8.3, cost 12 from PHP 8.4 on.
+	 */
+	private const DUMMY_HASH_COST_10 = '$2y$10$HK9Rv33v4BRVYhV7MWiDXO4wlv2D5RDDmrhBZEkx2dQL/1.0tLbHW';
+	private const DUMMY_HASH_COST_12 = '$2y$12$g/WDLPF9EmBGRZlDmXi.ie43qx0flN21eu9MDBQVrmy/9aAiNVZlG';
 
 	private UserRepository $users;
 	private Session $session;
@@ -44,7 +52,11 @@ final class Auth {
 	 */
 	public function attempt(string $username, string $password, ?string $initialLang = null): bool {
 		$user = $this->users->findByUsername($username);
-		if ($user === null || !password_verify($password, (string) $user['password_hash'])) {
+		if ($user === null) {
+			password_verify($password, PHP_VERSION_ID >= 80400 ? self::DUMMY_HASH_COST_12 : self::DUMMY_HASH_COST_10);
+			return false;
+		}
+		if (!password_verify($password, (string) $user['password_hash'])) {
 			return false;
 		}
 

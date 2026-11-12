@@ -11,7 +11,7 @@ declare(strict_types=1);
  * TMDB API (new episodes, seasons, last/next air date).
  *
  * Example crontab entry:
- *   30 4 * * * /usr/bin/php /var/www/catenvis/bin/update_followed.php >> /var/www/catenvis/catenvis.log 2>&1
+ *   30 4 * * * /usr/bin/php /var/www/catenvis/bin/update_followed.php >> /var/log/catenvis.log 2>&1
  */
 
 use Catenvis\Config;

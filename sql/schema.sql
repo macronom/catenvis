@@ -1,12 +1,22 @@
 -- Catenvis – database schema (MariaDB / MySQL, utf8mb4)
 --
--- Step 1: create database and user (run manually, replace <PASSWORD>).
---         On a remote server, replace '%' with the specific client address if needed.
+-- Step 1: create database and user (run manually as the database admin).
+--         Replace <PASSWORD>, and <APP-HOST> with the host the application
+--         connects from: 'localhost' when database and web server share a
+--         machine, otherwise its address (e.g. '192.0.2.10') or, for
+--         several clients in one network, a pattern like '192.0.2.%'.
+--         Avoid '%' (any host).
 --
 --   CREATE DATABASE catenvis CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
---   CREATE USER 'catenvis'@'%' IDENTIFIED BY '<PASSWORD>';
---   GRANT ALL PRIVILEGES ON catenvis.* TO 'catenvis'@'%';
---   FLUSH PRIVILEGES;
+--   CREATE USER 'catenvis'@'<APP-HOST>' IDENTIFIED BY '<PASSWORD>';
+--   GRANT SELECT, INSERT, UPDATE, DELETE,
+--         CREATE, ALTER, INDEX, REFERENCES
+--         ON catenvis.* TO 'catenvis'@'<APP-HOST>';
+--
+--         The first line is all the running application needs. The second
+--         serves bin/setup.php and bin/migrate.php (tables, columns, indexes,
+--         foreign keys). A future migration that drops a table would need
+--         DROP in addition; its file says so.
 --
 -- Step 2: load this schema into the catenvis database, e.g.:
 --   mysql -h <db-host> -u catenvis -p catenvis < sql/schema.sql

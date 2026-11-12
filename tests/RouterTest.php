@@ -88,6 +88,16 @@ final class RouterTest extends TestCase {
 		self::assertFalse($router->dispatch($this->request('GET', '/series/5')));
 	}
 
+	public function testTrailingNewlineDoesNotMatch(): void {
+		$router = new Router();
+		$router->add('GET', '/login', static function (): void {});
+		$router->add('GET', '/series/{id}', static function (): void {});
+
+		// %0A decodes to "\n" in the path; "$" would still match before it.
+		self::assertFalse($router->dispatch($this->request('GET', '/login%0A')));
+		self::assertTrue($router->dispatch($this->request('GET', '/login')));
+	}
+
 	public function testHandlerReceivesTheDispatchedRequest(): void {
 		$router = new Router();
 		$request = $this->request('GET', '/import');

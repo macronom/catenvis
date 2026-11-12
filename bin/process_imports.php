@@ -9,10 +9,11 @@ declare(strict_types=1);
 /**
  * Background worker for the IMDb import: drains the queue (import_queue).
  * Started automatically by the import page, but can also be run manually
- * or via cron:
- *   /usr/bin/php /var/www/catenvis/bin/process_imports.php
+ * or via cron - as the web server user, so it shares the lock file:
+ *   sudo -u www-data /usr/bin/php /var/www/catenvis/bin/process_imports.php
  *
- * A file lock ensures only one worker runs at a time.
+ * A file lock in import.work_dir (default: the system temp directory)
+ * ensures only one worker runs at a time.
  */
 
 use Catenvis\Config;
@@ -33,16 +34,19 @@ if (PHP_SAPI !== 'cli') {
 $projectDir = dirname(__DIR__);
 require $projectDir . '/vendor/autoload.php';
 
+$config = Config::load($projectDir . '/config/config.php');
+
 // Only one worker at a time.
-$lockPath = sys_get_temp_dir() . '/catenvis_import.lock';
-$lock = fopen($lockPath, 'c');
-if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+$lockPath = $config->importWorkDir() . '/catenvis_import.lock';
+$lock = @fopen($lockPath, 'c');
+if ($lock === false) {
+	fwrite(STDERR, "Cannot open the lock file $lockPath. Run the worker as the web server user (e.g. sudo -u www-data) or check import.work_dir.\n");
+	exit(1);
+}
+if (!flock($lock, LOCK_EX | LOCK_NB)) {
 	// A worker is already running - it will pick up new entries too.
 	exit(0);
 }
-@chmod($lockPath, 0666);
-
-$config = Config::load($projectDir . '/config/config.php');
 /** @var array<string, mixed> $dbConfig */
 $dbConfig = $config->get('db', []);
 $db = new Database($dbConfig);

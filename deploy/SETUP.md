@@ -55,13 +55,19 @@ loads the schema and creates the first admin account (use `base_url`
 `/catenvis`). `deploy.sh` never touches `config/config.php` afterwards, so this
 is a one-time step. All options are documented in `config/config.sample.php`.
 
-`config/config.php` holds the database password and the TMDB token, and is
-created readable for every local account. Restrict it to its owner and the
-web server's group (`www-data` on Debian/Ubuntu; Apache and the cron job run
-as that user):
+`config/config.php` holds the database password and the TMDB token, so
+`setup.php` creates it readable only by its owner and its group (mode 640).
+Give it the web server's group (`www-data` on Debian/Ubuntu; Apache and the
+cron job run as that user), otherwise the application cannot read it:
 
 ```bash
 sudo chgrp www-data /var/www/catenvis/config/config.php
+```
+
+An older installation may still have a config readable by every local
+account; restrict it as well:
+
+```bash
 sudo chmod 640 /var/www/catenvis/config/config.php
 ```
 

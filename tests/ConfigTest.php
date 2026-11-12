@@ -13,7 +13,7 @@ use RuntimeException;
 
 /**
  * Covers configuration loading and access: load() error handling,
- * dot-notation lookup with defaults, and isProduction().
+ * dot-notation lookup with defaults, and isDevelopment().
  */
 final class ConfigTest extends TestCase {
 	/** @var list<string> Temp fixture files to clean up. */
@@ -73,15 +73,17 @@ final class ConfigTest extends TestCase {
 		self::assertSame('fallback', $config->get('db.host', 'fallback'));
 	}
 
-	public function testIsProductionIsTrueForProductionEnvironment(): void {
-		$config = $this->makeConfig(['environment' => 'production']);
-
-		self::assertTrue($config->isProduction());
+	public function testIsDevelopmentOnlyForTheExactValue(): void {
+		self::assertTrue($this->makeConfig(['environment' => 'development'])->isDevelopment());
 	}
 
-	public function testIsProductionIsFalseOtherwise(): void {
-		self::assertFalse($this->makeConfig(['environment' => 'development'])->isProduction());
-		self::assertFalse($this->makeConfig([])->isProduction());
+	public function testAnythingElseMeansProduction(): void {
+		self::assertFalse($this->makeConfig(['environment' => 'production'])->isDevelopment());
+		self::assertFalse($this->makeConfig([])->isDevelopment());
+		self::assertFalse($this->makeConfig(['environment' => 'Development'])->isDevelopment());
+		self::assertFalse($this->makeConfig(['environment' => 'development '])->isDevelopment());
+		self::assertFalse($this->makeConfig(['environment' => 'dev'])->isDevelopment());
+		self::assertFalse($this->makeConfig(['environment' => true])->isDevelopment());
 	}
 
 	public function testImportWorkDirDefaultsToTheTempDirectory(): void {

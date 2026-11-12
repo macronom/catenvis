@@ -13,7 +13,8 @@ declare(strict_types=1);
  */
 
 return [
-	// 'production' hides PHP errors, 'development' shows them.
+	// 'development' shows PHP errors and error details; anything else
+	// (including a typo or a missing entry) runs as 'production'.
 	'environment' => 'production',
 
 	// Base URL path the application is served from (no trailing slash).

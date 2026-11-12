@@ -70,9 +70,11 @@ final class Config {
 	}
 
 	/**
-	 * Checks whether the application runs in production mode.
+	 * Checks whether the application runs in development mode. Only the exact
+	 * value 'development' counts; a typo or a missing entry means production,
+	 * so error details are never shown by accident.
 	 */
-	public function isProduction(): bool {
-		return $this->get('environment') === 'production';
+	public function isDevelopment(): bool {
+		return $this->get('environment') === 'development';
 	}
 }

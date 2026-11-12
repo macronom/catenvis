@@ -163,11 +163,15 @@ $config = [
 	'tmdb'        => $tmdbConfig,
 	'update'      => ['stale_after_days' => 3],
 ];
-if (file_put_contents($configPath, ConfigWriter::render($config)) === false) {
+// It holds the passwords: restrict it before any content is written.
+if (!touch($configPath) || !chmod($configPath, 0640)
+	|| file_put_contents($configPath, ConfigWriter::render($config)) === false) {
 	fwrite(STDERR, "Could not write $configPath.\n");
 	exit(1);
 }
-echo "Wrote config/config.php\n";
+echo "Wrote config/config.php (mode 640). The web server must be able to read it:\n";
+echo "give it the web server's group, e.g. on Debian/Ubuntu:\n";
+echo "  sudo chgrp www-data $configPath\n";
 
 // 8. Load the full schema (fresh install; includes the migration markers).
 $schema = file_get_contents($projectDir . '/sql/schema.sql');
@@ -210,9 +214,8 @@ echo "\nSetup complete. Next:\n";
 echo "  - Point your web server at html/ (see deploy/SETUP.md).\n";
 echo "  - Install the update cron (deploy/catenvis.cron).\n";
 echo "  - Open the site and log in as \"$adminUser\" to set a new password.\n";
-echo "  - Restrict config/config.php (it holds the passwords) to its owner and the\n";
-echo "    web server group, e.g. on Debian/Ubuntu:\n";
-echo "      sudo chgrp www-data $configPath && sudo chmod 640 $configPath\n";
+echo "  - If not done yet, give config/config.php the web server's group, e.g.:\n";
+echo "      sudo chgrp www-data $configPath\n";
 
 /**
  * Prompts with a default; an empty answer keeps the default.

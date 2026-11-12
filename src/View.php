@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace Catenvis;
 
 use RuntimeException;
+use Throwable;
 
 /**
  * Renders lean PHP templates (*.tpl.php) within a layout.
@@ -79,10 +80,19 @@ final class View {
 		]);
 
 		ob_start();
-		(static function (string $file, array $scope): void {
-			extract($scope, EXTR_SKIP);
-			require $file;
-		})($file, $scope);
+		$level = ob_get_level();
+		try {
+			(static function (string $file, array $scope): void {
+				extract($scope, EXTR_SKIP);
+				require $file;
+			})($file, $scope);
+		} catch (Throwable $e) {
+			// Discard the partial output (and buffers the template left open).
+			while (ob_get_level() >= $level) {
+				ob_end_clean();
+			}
+			throw $e;
+		}
 
 		return (string) ob_get_clean();
 	}

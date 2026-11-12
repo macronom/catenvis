@@ -17,6 +17,10 @@ use Catenvis\Controller\WatchController;
 use Catenvis\Request;
 use Catenvis\Router;
 
+// Until the configuration is loaded, never show errors (App enables the
+// display again in development mode).
+ini_set('display_errors', '0');
+
 $projectDir = dirname(__DIR__);
 require $projectDir . '/vendor/autoload.php';
 

@@ -60,8 +60,11 @@ final class App {
 	private ?Translator $translator = null;
 	/** @var array<string, string>|null Cached selectable languages (code => autonym). */
 	private ?array $languageList = null;
+	/** Output buffer level at start-up; deeper buffers belong to this request. */
+	private int $bufferLevel = 0;
 
 	public function __construct(string $projectDir) {
+		$this->bufferLevel = ob_get_level();
 		$this->projectDir = rtrim($projectDir, '/');
 		$this->config = Config::load($this->projectDir . '/config/config.php');
 
@@ -171,12 +174,17 @@ final class App {
 	 */
 	private function handleUncaught(Throwable $e): void {
 		self::logThrowable($e);
+		// Drop whatever was rendered before the failure, so the error page
+		// does not follow half a page.
+		while (ob_get_level() > $this->bufferLevel) {
+			ob_end_clean();
+		}
 		if (!headers_sent()) {
 			http_response_code(500);
 		}
 
 		$message = $this->t('An unexpected error occurred.');
-		if (!$this->config->isProduction()) {
+		if ($this->config->isDevelopment()) {
 			$message .= sprintf(' %s: %s (%s:%d)', $e::class, $e->getMessage(), $e->getFile(), $e->getLine());
 		}
 
@@ -454,13 +462,11 @@ final class App {
 		}
 	}
 
+	/**
+	 * Reports all errors; shows them only in development mode.
+	 */
 	private function configureErrorReporting(): void {
-		if ($this->config->isProduction()) {
-			error_reporting(E_ALL);
-			ini_set('display_errors', '0');
-		} else {
-			error_reporting(E_ALL);
-			ini_set('display_errors', '1');
-		}
+		error_reporting(E_ALL);
+		ini_set('display_errors', $this->config->isDevelopment() ? '1' : '0');
 	}
 }

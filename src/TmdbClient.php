@@ -129,6 +129,7 @@ final class TmdbClient implements TmdbApi {
 
 		$attempts = 0;
 		$lastError = '';
+		$lastDetail = '';
 		while ($attempts < 3) {
 			$attempts++;
 			$ch = curl_init($url);
@@ -145,7 +146,10 @@ final class TmdbClient implements TmdbApi {
 			$err    = curl_error($ch);
 
 			if ($errno !== 0) {
-				$lastError = "curl error: $err";
+				// curl's own text may name internal hosts or proxies: it only
+				// goes to the log, users see the generic text for the number.
+				$lastError  = sprintf('connection error %d (%s)', $errno, curl_strerror($errno));
+				$lastDetail = "curl error $errno: $err";
 				continue;
 			}
 			if ($status === 429) {
@@ -163,6 +167,10 @@ final class TmdbClient implements TmdbApi {
 
 			/** @var array<string, mixed> $decoded */
 			return $decoded;
+		}
+
+		if ($lastDetail !== '') {
+			error_log("Catenvis: TMDB request for $endpoint: $lastDetail");
 		}
 
 		throw new TmdbException("TMDB request failed after $attempts attempts: $lastError");

@@ -15,7 +15,7 @@ use RuntimeException;
  * Authentication preferably via v4 Read Access Token (Bearer),
  * alternatively via v3 api_key as a query parameter.
  */
-final class TmdbClient {
+final class TmdbClient implements TmdbApi {
 	private const BASE_URL = 'https://api.themoviedb.org/3';
 
 	private string $readAccessToken;

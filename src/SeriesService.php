@@ -14,7 +14,7 @@ use Catenvis\Repository\SeriesRepository;
  * Used both when adding a series and by the daily cron.
  */
 final class SeriesService {
-	private TmdbClient $tmdb;
+	private TmdbApi $tmdb;
 	private SeriesRepository $series;
 	/** @var list<string> Active series content languages (always contains the base language and 'en'). */
 	private array $languages;
@@ -27,7 +27,7 @@ final class SeriesService {
 	 * @param list<string> $languages        Active series content languages.
 	 * @param list<string> $episodeLanguages Active episode title languages.
 	 */
-	public function __construct(TmdbClient $tmdb, SeriesRepository $series, array $languages = ['en'], array $episodeLanguages = ['en']) {
+	public function __construct(TmdbApi $tmdb, SeriesRepository $series, array $languages = ['en'], array $episodeLanguages = ['en']) {
 		$this->tmdb             = $tmdb;
 		$this->series           = $series;
 		$this->languages        = $languages;
@@ -58,6 +58,11 @@ final class SeriesService {
 		$externalIds     = is_array($details['external_ids'] ?? null) ? $details['external_ids'] : [];
 		$originalLanguage = $this->stringOrNull($details['original_language'] ?? null);
 
+		// upsertSeries stamps synced_at right away; that early stamp keeps a
+		// series being added safe from SeriesRepository::deleteOrphans. If the
+		// rest of the sync fails, the old stamp is restored so the series stays
+		// due instead of looking fresh for up to 50 days.
+		$previousSync = $this->series->syncedAt($seriesId);
 		$this->series->upsertSeries([
 			'id'                 => $seriesId,
 			'original_name'      => (string) ($details['original_name'] ?? ''),
@@ -73,6 +78,22 @@ final class SeriesService {
 			'next_air_date'      => $this->episodeDate($details['next_episode_to_air'] ?? null),
 		]);
 
+		try {
+			return $this->syncContent($seriesId, $details, $forceSeasons);
+		} catch (\Throwable $e) {
+			$this->series->restoreSyncedAt($seriesId, $previousSync);
+			throw $e;
+		}
+	}
+
+	/**
+	 * Stores translations and (changed) seasons of a series whose details
+	 * were just fetched. Part of sync().
+	 *
+	 * @param array<string, mixed> $details
+	 * @return int Number of seasons reloaded from TMDB.
+	 */
+	private function syncContent(int $seriesId, array $details, bool $forceSeasons): int {
 		// Translations for all active languages: the base language comes from
 		// the top-level payload fields (the request runs in that language),
 		// all others from the translations payload of the same request.
@@ -101,8 +122,12 @@ final class SeriesService {
 		// One pass over the stored episodes: per-season id sets, used both for
 		// the change check and for language marker rows.
 		$episodesBySeason = [];
+		$parkedSeasons    = [];
 		foreach ($this->series->episodesForSeries($seriesId) as $episode) {
 			$episodesBySeason[(int) $episode['season_number']][] = (int) $episode['id'];
+			if ((int) $episode['episode_number'] >= SeriesRepository::PARKED_EPISODE_MIN) {
+				$parkedSeasons[(int) $episode['season_number']] = true;
+			}
 		}
 
 		// Per-season title coverage in ONE query: which languages still lack
@@ -131,10 +156,13 @@ final class SeriesService {
 			$missing  = $missingBySeason[$seasonNumber] ?? [];
 
 			// Base fetch when episodes are new/changed, for the latest
-			// (running) season, when base language title rows are missing, or
+			// (running) season, when base language title rows are missing, when
+			// rows are still parked from an aborted sync (they would otherwise
+			// count as present and keep the season from being fetched), or
 			// when a backfill forces every season.
 			$needsBase = $forceSeasons || $existing === 0 || $existing !== $expected
-				|| $seasonNumber === $maxSeason || in_array($this->baseLang, $missing, true);
+				|| $seasonNumber === $maxSeason || in_array($this->baseLang, $missing, true)
+				|| isset($parkedSeasons[$seasonNumber]);
 
 			if (!$needsBase && $missing === []) {
 				continue;
@@ -175,7 +203,7 @@ final class SeriesService {
 			}
 			foreach ($episodesBySeason[$seasonNumber] ?? [] as $episodeId) {
 				foreach ($langs as $lang) {
-					$this->series->upsertEpisodeTranslation($episodeId, $lang, '');
+					$this->series->addEpisodeTranslationMarker($episodeId, $lang);
 				}
 			}
 		}
@@ -210,15 +238,21 @@ final class SeriesService {
 				'overview'       => $this->stringOrNull($episode['overview'] ?? null),
 			];
 		}
-		$this->series->replaceSeasonEpisodes($seriesId, $seasonNumber, $rows, $this->baseLang);
+		// An empty payload leaves the stored episodes untouched: parking them
+		// would hide them as unplaceable rows if the payload was a glitch. A
+		// season that is really empty is cleared by deleteStaleEpisodes().
+		if ($rows !== []) {
+			$this->series->replaceSeasonEpisodes($seriesId, $seasonNumber, $rows, $this->baseLang);
+		}
 
 		return array_column($rows, 'id');
 	}
 
 	/**
 	 * Fetches a season once more in the given language and stores the episode
-	 * titles. Episodes missing from the payload (or with empty names) get an
-	 * empty marker row so the series does not stay due forever (anti-loop).
+	 * titles. Episodes missing from the payload get an empty marker row so the
+	 * series does not stay due forever (anti-loop) - but only where no row
+	 * exists yet: an incomplete payload must not wipe stored titles.
 	 *
 	 * @param list<int> $episodeIds Stored episode ids of this season.
 	 */
@@ -237,7 +271,11 @@ final class SeriesService {
 		}
 
 		foreach ($episodeIds as $episodeId) {
-			$this->series->upsertEpisodeTranslation($episodeId, $lang, $names[$episodeId] ?? '', $overviews[$episodeId] ?? null);
+			if (array_key_exists($episodeId, $names)) {
+				$this->series->upsertEpisodeTranslation($episodeId, $lang, $names[$episodeId], $overviews[$episodeId]);
+			} else {
+				$this->series->addEpisodeTranslationMarker($episodeId, $lang);
+			}
 		}
 	}
 

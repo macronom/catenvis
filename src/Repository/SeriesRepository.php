@@ -15,7 +15,13 @@ use Catenvis\EpisodeTitle;
  */
 final class SeriesRepository {
 	/** Added to episode numbers while a season is re-stored (fits SMALLINT UNSIGNED). */
-	private const PARKED_EPISODE_OFFSET = 32768;
+	/** Highest episode_number (SMALLINT UNSIGNED); parking slots count down from here. */
+	private const MAX_EPISODE_NUMBER = 65535;
+	/**
+	 * Real episode numbers stay far below this; any number at or above it is
+	 * a parked row (top slots, or the former +32768 parking scheme).
+	 */
+	public const PARKED_EPISODE_MIN = 32768;
 
 	private Database $db;
 
@@ -74,6 +80,22 @@ final class SeriesRepository {
 				sync_failed_at = NULL',
 			$data
 		);
+	}
+
+	/**
+	 * Time of the last sync stamp (synced_at) of a series, or null.
+	 */
+	public function syncedAt(int $seriesId): ?string {
+		$value = $this->db->fetchValue('SELECT synced_at FROM series WHERE id = ?', [$seriesId]);
+
+		return $value === null ? null : (string) $value;
+	}
+
+	/**
+	 * Puts back the sync stamp a failed sync replaced (null = never synced).
+	 */
+	public function restoreSyncedAt(int $seriesId, ?string $syncedAt): void {
+		$this->db->execute('UPDATE series SET synced_at = ? WHERE id = ?', [$syncedAt, $seriesId]);
 	}
 
 	/**
@@ -159,26 +181,50 @@ final class SeriesRepository {
 	}
 
 	/**
+	 * Adds an empty marker row for an episode language (title not available)
+	 * unless a row already exists; never overwrites a stored title.
+	 */
+	public function addEpisodeTranslationMarker(int $episodeId, string $lang): void {
+		$this->db->execute(
+			"INSERT INTO episode_translations (episode_id, lang, name, overview)
+			 SELECT e.id, ?, '', NULL FROM episodes e WHERE e.id = ?
+			 ON DUPLICATE KEY UPDATE episode_id = episode_id",
+			[$lang, $episodeId]
+		);
+	}
+
+	/**
 	 * Stores the episodes of one season as TMDB currently lists them, together
 	 * with their base language title rows, in one transaction.
 	 *
 	 * TMDB may renumber episodes (e.g. swap E03 and E05). Upserting them one by
 	 * one would then hit the unique (series, season, number) key, because the
 	 * target slot is still held by another episode. So the stored episodes of
-	 * the season are first parked on numbers above the real range and then
+	 * the season are first parked on the top slots (65535, 65534, ...) and then
 	 * moved to their new slots. Rows not contained in the payload stay parked
 	 * until deleteStaleEpisodes() removes them (or a later season fetch moves
 	 * them to the season they belong to now).
+	 *
+	 * Parking includes rows still parked from an earlier sync that was aborted
+	 * before deleteStaleEpisodes(): every row of the season gets its own slot,
+	 * assigned from the highest current number down. The i-th highest number
+	 * is at most 65535 - i, so each target slot is either the row's own or
+	 * already vacated - no unique-key collision.
 	 *
 	 * @param list<array{id: int, season_number: int, episode_number: int, air_date: ?string, runtime: ?int, name: string, overview: ?string}> $episodes
 	 */
 	public function replaceSeasonEpisodes(int $seriesId, int $seasonNumber, array $episodes, string $lang): void {
 		$this->db->transaction(function (Database $db) use ($seriesId, $seasonNumber, $episodes, $lang): void {
-			$db->execute(
-				'UPDATE episodes SET episode_number = episode_number + ?
-				 WHERE series_id = ? AND season_number = ? AND episode_number < ?',
-				[self::PARKED_EPISODE_OFFSET, $seriesId, $seasonNumber, self::PARKED_EPISODE_OFFSET]
+			$stored = $db->fetchAll(
+				'SELECT id FROM episodes WHERE series_id = ? AND season_number = ? ORDER BY episode_number DESC',
+				[$seriesId, $seasonNumber]
 			);
+			foreach ($stored as $slot => $row) {
+				$db->execute(
+					'UPDATE episodes SET episode_number = ? WHERE id = ?',
+					[self::MAX_EPISODE_NUMBER - $slot, (int) $row['id']]
+				);
+			}
 			foreach ($episodes as $episode) {
 				$this->upsertEpisode([
 					'id'             => $episode['id'],

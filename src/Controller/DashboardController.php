@@ -9,6 +9,7 @@ namespace Catenvis\Controller;
 
 use Catenvis\App;
 use Catenvis\Request;
+use Catenvis\SearchQuery;
 
 /**
  * Home page: overview of the followed series incl. progress and new episodes.
@@ -44,6 +45,33 @@ final class DashboardController {
 			'stoppedTotal'   => $this->app->watch->countByFollowStatus($userId, 'stopped'),
 			'unavailable'    => $this->app->series->unavailableForUser($userId, $this->app->contentLang),
 			'pageSize'       => self::PAGE_SIZE,
+		]);
+	}
+
+	/**
+	 * Search within the user's own series (all follow statuses). Shows every
+	 * match, grouped like the dashboard; also a single match stays on this page.
+	 */
+	public function search(Request $request): void {
+		$this->app->requireUser();
+		$userId = (int) $this->app->auth->userId();
+		$query  = mb_substr($request->getString('q'), 0, SearchQuery::MAX_LENGTH);
+		$terms  = SearchQuery::terms($query);
+
+		$following = [];
+		$stopped   = [];
+		if ($terms !== []) {
+			$following = $this->app->watch->seriesPage($userId, 'search', 'following', null, 0, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang, $terms);
+			$stopped   = $this->app->watch->seriesPage($userId, 'search', 'stopped', null, 0, $this->app->titleLang, $this->app->contentLang, $this->app->baseLang, $terms);
+		}
+
+		$this->app->view->render('search', [
+			'pageTitle' => $query !== '' ? $this->app->t('Search: %s', $query) : $this->app->t('Search my series'),
+			'query'     => $query,
+			'searched'  => $terms !== [],
+			'view'      => $this->app->preference('pref_view', ['grid', 'list'], 'grid'),
+			'following' => $following,
+			'stopped'   => $stopped,
 		]);
 	}
 

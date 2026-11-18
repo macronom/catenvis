@@ -57,6 +57,7 @@ $router->add('GET', '/stats/top', [$stats, 'topMore']);
 // Series.
 $router->add('GET',  '/',            [$dashboard, 'index']);
 $router->add('GET',  '/more',        [$dashboard, 'more']);
+$router->add('GET',  '/search',      [$dashboard, 'search']);
 $router->add('GET',  '/add',         [$series, 'search']);
 $router->add('POST', '/add',         [$series, 'add']);
 $router->add('GET',  '/series/{id}', [$series, 'show']);

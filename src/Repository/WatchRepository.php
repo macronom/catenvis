@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace Catenvis\Repository;
 
 use Catenvis\Database;
+use Catenvis\SearchQuery;
 
 /**
  * Database access to user_watched and derived progress queries.
@@ -64,6 +65,8 @@ final class WatchRepository {
 	 *                          upcoming airing first; the others: most recently
 	 *                          aired episode first (the rest group additionally
 	 *                          puts running series before ended/canceled ones).
+	 *                          'search' puts titles starting with the search
+	 *                          terms first, then sorts alphabetically.
 	 * @param string   $status Follow status; 'following' also covers deferred
 	 *                          series ('deferred'), 'stopped' only stopped ones.
 	 * @param int|null $limit  Maximum count (null = unlimited).
@@ -71,9 +74,11 @@ final class WatchRepository {
 	 * @param string   $titleLang ISO code of the own language or 'original' (title/sort mode).
 	 * @param string   $userLang  Content language of the user (for JOIN and fallback).
 	 * @param string   $baseLang  Base language of the TMDB data (episode title fallback).
+	 * @param list<string> $terms Search terms (see SearchQuery); each one must occur
+	 *                          in the own-language, English or original title.
 	 * @return list<array<string, mixed>>
 	 */
-	public function seriesPage(int $userId, string $sort, string $status, ?int $limit = null, int $offset = 0, string $titleLang = 'en', string $userLang = 'en', string $baseLang = 'en'): array {
+	public function seriesPage(int $userId, string $sort, string $status, ?int $limit = null, int $offset = 0, string $titleLang = 'en', string $userLang = 'en', string $baseLang = 'en', array $terms = []): array {
 		// Whitelist – no user input directly in ORDER BY.
 		// The default order mirrors the dashboard badges exactly: only what a
 		// card shows may rank it. upcoming_count/next_ep/next_up_episode
@@ -112,7 +117,15 @@ final class WatchRepository {
 			. ", CASE WHEN NOT ($hasUpcoming) THEN $lastAiredKey END DESC"
 			. ", $titleExpr";
 
-		$orderBy = $sort === 'name' ? $titleExpr : $defaultOrder;
+		// The search order refers to the select alias sort_title, because native
+		// prepares do not allow the :lang_title parameter twice.
+		$isSearch = $sort === 'search' && $terms !== [];
+		$searchOrder = "CASE WHEN sort_title LIKE :prefix ESCAPE '" . SearchQuery::ESCAPE_CHAR . "' THEN 0 ELSE 1 END, sort_title";
+		$orderBy = match (true) {
+			$isSearch        => $searchOrder,
+			$sort === 'name' => $titleExpr,
+			default          => $defaultOrder,
+		};
 
 		// LIMIT/OFFSET are inserted as validated integers (native prepares
 		// do not allow bound parameters here).
@@ -155,8 +168,27 @@ final class WatchRepository {
 			$params['status'] = $status;
 		}
 
+		// Every term must occur in one of the titles. Each occurrence needs its
+		// own parameter name (native prepares).
+		$escape = "ESCAPE '" . SearchQuery::ESCAPE_CHAR . "'";
+		$termSql = '';
+		foreach ($terms as $i => $term) {
+			$pattern = SearchQuery::containsPattern($term);
+			$params["term{$i}_user"] = $pattern;
+			$params["term{$i}_en"]   = $pattern;
+			$params["term{$i}_orig"] = $pattern;
+			$termSql .= " AND (tul.name LIKE :term{$i}_user $escape"
+				. " OR ten.name LIKE :term{$i}_en $escape"
+				. " OR s.original_name LIKE :term{$i}_orig $escape)";
+		}
+		$sortTitleSql = '';
+		if ($isSearch) {
+			$sortTitleSql = "$titleExpr AS sort_title,";
+			$params['prefix'] = SearchQuery::prefixPattern($terms);
+		}
+
 		return $this->db->fetchAll(
-			'SELECT s.*, s.status AS series_status, us.status,
+			'SELECT s.*, s.status AS series_status, us.status, ' . $sortTitleSql . '
 				COALESCE(NULLIF(tul.name, \'\'), NULLIF(ten.name, \'\'), s.original_name) AS name,
 				ten.name AS title_en,
 				(SELECT COUNT(*) FROM episodes e
@@ -219,7 +251,7 @@ final class WatchRepository {
 			 JOIN series s ON s.id = us.series_id
 			 LEFT JOIN series_translations tul ON tul.series_id = s.id AND tul.lang = :lang_user
 			 LEFT JOIN series_translations ten ON ten.series_id = s.id AND ten.lang = \'en\'
-			 WHERE us.user_id = :uid_where AND ' . $statusCond . '
+			 WHERE us.user_id = :uid_where AND ' . $statusCond . $termSql . '
 			 ORDER BY ' . $orderBy . $limitSql,
 			$params
 		);
